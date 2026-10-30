@@ -132,7 +132,8 @@ async function loadPlayers() {
     const item = document.createElement("div");
     item.className = "player";
     item.textContent =
-      `${player.nickname} — ${player.ready ? "✅ Listo" : "⌛ Preparándose"}`;
+      item.textContent =
+        `${player.nickname} — ${player.ready ? "✅ Listo" : "⌛ Preparándose"} — ⭐ ${player.score || 0} puntos`;
     $("players-list").appendChild(item);
   });
 
