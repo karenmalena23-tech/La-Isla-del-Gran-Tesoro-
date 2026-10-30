@@ -4,8 +4,8 @@
 
 // CONFIGURACIÓN DE SUPABASE
 // Más adelante colocaremos aquí la URL y la clave publicable.
-const SUPABASE_URL = "TU_SUPABASE_URL";
-const SUPABASE_KEY = "TU_SUPABASE_PUBLISHABLE_KEY";
+const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 
 let supabase = null;
 let currentPlayer = null;
