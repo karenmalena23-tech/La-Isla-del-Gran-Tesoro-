@@ -6,83 +6,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>La Isla del Gran Tesoro</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <main class="app">
-    <header>
-      <div class="logo">🏝️</div>
-      <h1>La Isla del Gran Tesoro</h1>
-      <p>¡Explora, salta y encuentra tesoros con tu compañero!</p>
-    </header>
+  <header>
+    <h1>🏝️ La Isla del Gran Tesoro</h1>
+    <p>¡Exploren juntos y encuentren el tesoro perdido!</p>
+  </header>
 
-    <section id="menu" class="panel">
-      <h2>¡Comienza tu aventura!</h2>
+  <main>
+    <section id="lobby" class="panel">
+      <h2>¡Preparen su aventura!</h2>
 
-      <label for="nickname">Tu nombre de aventurero</label>
-      <input id="nickname" maxlength="18" placeholder="Escribe tu nombre">
+      <label for="nickname">Tu nombre</label>
+      <input id="nickname" maxlength="14" placeholder="Escribe tu nombre">
 
-      <label for="character">Elige tu personaje</label>
+      <label for="character">Elige tu explorador</label>
       <select id="character">
-        <option value="Nico">🧢 Nico, el explorador</option>
-        <option value="Luna">🌙 Luna, la aventurera</option>
-        <option value="Coco">🏴‍☠️ Capitán Coco</option>
-        <option value="Chispa">🦊 Chispa, el zorrito</option>
+        <option value="🧭">Nico 🧭</option>
+        <option value="🌙">Luna 🌙</option>
+        <option value="🏴‍☠️">Capitán Coco 🏴‍☠️</option>
+        <option value="⚡">Chispa ⚡</option>
       </select>
 
-      <button id="createBtn">🌴 Crear una partida</button>
+      <label for="roomCode">Código de sala</label>
+      <input id="roomCode" maxlength="8" placeholder="Ej. ISLA25">
 
-      <div class="separator">O únete a un amigo</div>
-
-      <label for="roomCode">Código de la partida</label>
-      <input id="roomCode" maxlength="6" placeholder="Ejemplo: ABC123">
-      <button id="joinBtn" class="secondary">🚀 Unirme a la partida</button>
-
-      <p id="menuMessage" class="message"></p>
+      <div class="actions">
+        <button id="createBtn">Crear aventura</button>
+        <button id="joinBtn" class="secondary">Unirse a una sala</button>
+      </div>
+      <p id="status">Crea una sala o únete con un código.</p>
     </section>
 
     <section id="game" class="hidden">
-      <div class="game-top panel">
-        <div>
-          <strong>🏝️ La Isla del Gran Tesoro</strong>
-          <p>Sala: <span id="codeLabel">------</span>
-            <button id="copyBtn" class="small">Copiar</button>
-          </p>
-        </div>
-        <div class="score-area">
-          <span>🪙 Tus monedas: <strong id="score">0</strong></span>
-          <span id="playerStatus">Esperando compañero...</span>
-        </div>
+      <div class="hud">
+        <span id="roomLabel">Sala: ---</span>
+        <span id="playersLabel">Jugadores: 1/2</span>
+        <span id="keyLabel">🗝️ Llave: no encontrada</span>
+        <span id="gemLabel">💎 Gemas: 0</span>
       </div>
 
-      <div class="game-frame">
-        <canvas id="gameCanvas" width="960" height="440"></canvas>
+      <div class="game-wrap">
+        <canvas id="gameCanvas" width="960" height="480"></canvas>
       </div>
 
-      <div class="instructions panel">
-        <strong>Cómo jugar:</strong>
-        <span>← → o A/D para moverte</span>
-        <span>↑, W o ESPACIO para saltar</span>
-        <span>¡Recoge las monedas y busca el cofre!</span>
+      <div class="instructions">
+        <p><b>Controles:</b> A / D o ← / → para caminar · W, ↑ o espacio para saltar · E para interactuar.</p>
+        <p>Busca la llave, descubre la entrada de la cueva y abre el cofre. ¡Trabajen en equipo!</p>
       </div>
 
-      <div class="mobile-controls">
-        <button id="leftBtn">◀</button>
-        <button id="jumpBtn">⬆ SALTAR</button>
-        <button id="rightBtn">▶</button>
-      </div>
-
-      <div class="panel players-panel">
-        <h3>🧑‍🤝‍🧑 Exploradores conectados</h3>
-        <div id="playersList">Conectando...</div>
-      </div>
-
-      <p id="gameMessage" class="message"></p>
+      <div id="message" class="message">¡Exploren la isla!</div>
+      <button id="leaveBtn" class="secondary">Salir de la aventura</button>
     </section>
-
-    <footer>Hecho para pequeños grandes aventureros ✨</footer>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
 </html>
