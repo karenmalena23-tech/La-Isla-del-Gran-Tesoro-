@@ -635,3 +635,80 @@ footer {
     flex: 1;
   }
 }
+/* Mundo más largo */
+.game-world {
+  width: 4200px;
+}
+
+/* Línea de llegada */
+.finish-line {
+  left: 4050px;
+}
+
+/* Área de plataformas */
+.platform-area {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Superficies para saltar */
+.game-platform {
+  position: absolute;
+  height: 18px;
+  background: linear-gradient(#9b693c, #57351f);
+  border: 3px solid #3b281c;
+  border-radius: 12px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Pantalla de victoria */
+.winner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 12, 25, 0.88);
+}
+
+.winner-overlay[hidden] {
+  display: none;
+}
+
+.winner-card {
+  width: min(90%, 500px);
+  padding: 40px 25px;
+  text-align: center;
+  color: white;
+  background: linear-gradient(145deg, #183b54, #101d32);
+  border: 4px solid #e6b84d;
+  border-radius: 24px;
+  box-shadow: 0 0 35px rgba(230, 184, 77, 0.35);
+}
+
+.winner-card h1 {
+  margin: 0 0 20px;
+  font-size: clamp(42px, 9vw, 70px);
+  color: #ffd45c;
+  letter-spacing: 3px;
+}
+
+.winner-card p {
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.winner-card button {
+  margin-top: 20px;
+  padding: 14px 25px;
+  border: 0;
+  border-radius: 12px;
+  background: #e6b84d;
+  color: #172333;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: pointer;
+}
