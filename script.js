@@ -3,454 +3,266 @@
 // TREASURE ISLAND - LABORATORIO 4
 // Supabase + JavaScript Vanilla
 // ==========================================
-
-// PEGA AQUÍ TUS DATOS DE SUPABASE
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 
-// CONEXIÓN
-const db = window.supabase.createClient(
+const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_KEY
 );
 
-// ESTADO DEL JUEGO
-let currentPlayer = null;
-let currentRoom = "isla-principal";
-let players = {};
-let treasures = [];
-let channel = null;
-
-const treasurePositions = [
-  { id: 1, x: 48, y: 25 },
+const ROOM = "isla-principal";
+const TREASURES = [
+  { id: 1, x: 20, y: 25 },
   { id: 2, x: 75, y: 30 },
-  { id: 3, x: 40, y: 70 },
-  { id: 4, x: 70, y: 75 },
-  { id: 5, x: 18, y: 55 }
+  { id: 3, x: 45, y: 70 },
+  { id: 4, x: 85, y: 80 }
 ];
 
-// ELEMENTOS HTML
-const pirateA = document.getElementById("pirateA");
-const pirateB = document.getElementById("pirateB");
-const treasureArea = document.getElementById("treasureArea");
-const joinButton = document.getElementById("joinButton");
-const findButton = document.getElementById("findTreasureButton");
-const message = document.getElementById("gameMessage");
-const status = document.getElementById("connectionStatus");
+let player = null;
+let players = [];
+let treasures = [];
 
-// MENSAJES
-function showMessage(text) {
-  message.textContent = text;
+const $ = (id) => document.getElementById(id);
+
+function message(text) {
+  const el = $("message") || $("status");
+  if (el) el.textContent = text;
 }
 
-// DIBUJAR TESOROS
-function renderTreasures() {
-  treasureArea.innerHTML = "";
+function render() {
+  const map = $("gameMap") || $("island") || $("map");
+  if (!map) return;
 
-  treasures.forEach(treasure => {
-    if (!treasure.found) {
-      const chest = document.createElement("div");
-      chest.className = "treasure";
-      chest.textContent = "🧰";
-      chest.style.left = treasure.x + "%";
-      chest.style.top = treasure.y + "%";
-      treasureArea.appendChild(chest);
-    }
-  });
-}
+  map.querySelectorAll(".game-player, .game-treasure").forEach(el => el.remove());
 
-// DIBUJAR JUGADORES
-function renderPlayers() {
-  const red = players.red;
-  const blue = players.blue;
-
-  pirateA.style.display = red ? "grid" : "none";
-  pirateB.style.display = blue ? "grid" : "none";
-
-  if (red) {
-    pirateA.style.left = red.x + "%";
-    pirateA.style.top = red.y + "%";
-    document.getElementById("nameA").textContent =
-      red.player_name;
-    document.getElementById("scoreA").textContent =
-      red.score;
-  }
-
-  if (blue) {
-    pirateB.style.left = blue.x + "%";
-    pirateB.style.top = blue.y + "%";
-    document.getElementById("nameB").textContent =
-      blue.player_name;
-    document.getElementById("scoreB").textContent =
-      blue.score;
-  }
-}
-
-// HISTORIAL
-function addActivity(text) {
-  const list = document.getElementById("activityList");
-  const item = document.createElement("li");
-
-  item.textContent = text;
-  list.prepend(item);
-
-  while (list.children.length > 6) {
-    list.removeChild(list.lastChild);
-  }
-}
-
-// CARGAR ESTADO GUARDADO
-async function loadGameData() {
-  const { data: playerData, error: playerError } =
-    await db
-      .from("game_players")
-      .select("*")
-      .eq("room_code", currentRoom);
-
-  if (playerError) throw playerError;
-
-  players = {};
-
-  playerData.forEach(player => {
-    players[player.role] = player;
+  treasures.forEach(t => {
+    const item = document.createElement("div");
+    item.className = "game-treasure";
+    item.textContent = "💎";
+    item.style.position = "absolute";
+    item.style.left = `${TREASURES.find(x => x.id === t.treasure_id)?.x || 50}%`;
+    item.style.top = `${TREASURES.find(x => x.id === t.treasure_id)?.y || 50}%`;
+    map.appendChild(item);
   });
 
-  const { data: treasureData, error: treasureError } =
-    await db
-      .from("game_treasures")
-      .select("*")
-      .eq("room_code", currentRoom);
-
-  if (treasureError) throw treasureError;
-
-  treasures = treasurePositions.map(treasure => ({
-    ...treasure,
-    found: treasureData.some(
-      saved => saved.treasure_id === treasure.id
-    )
-  }));
-
-  treasureData.forEach(saved => {
-    addActivity(
-      saved.player_name + " encontró un tesoro"
-    );
+  players.forEach(p => {
+    const item = document.createElement("div");
+    item.className = "game-player";
+    item.textContent = p.role === "red" ? "🏴‍☠️" : "⛵";
+    item.title = p.player_name;
+    item.style.position = "absolute";
+    item.style.left = `${p.x}%`;
+    item.style.top = `${p.y}%`;
+    map.appendChild(item);
   });
 
-  renderPlayers();
-  renderTreasures();
+  const score = $("score");
+  if (score && player) score.textContent = `Puntos: ${player.score}`;
 }
 
-// CONECTAR JUGADORES EN TIEMPO REAL
-async function connectRealtime() {
-  channel = db.channel("isla-" + currentRoom);
+async function loadData() {
+  const { data: p, error: pe } = await supabaseClient
+    .from("game_players")
+    .select("*")
+    .eq("room_code", ROOM);
 
-  channel
-    .on(
-      "broadcast",
-      { event: "player_update" },
-      ({ payload }) => {
-        if (!payload) return;
+  if (pe) throw pe;
+  players = p || [];
 
-        players[payload.role] = payload;
-        renderPlayers();
-      }
-    )
-    .on(
-      "broadcast",
-      { event: "treasure_update" },
-      ({ payload }) => {
-        if (!payload) return;
+  const { data: t, error: te } = await supabaseClient
+    .from("game_treasures")
+    .select("*")
+    .eq("room_code", ROOM);
 
-        const treasure = treasures.find(
-          item => item.id === payload.treasure_id
-        );
-
-        if (treasure && !treasure.found) {
-          treasure.found = true;
-          renderTreasures();
-
-          addActivity(
-            payload.player_name + " encontró un tesoro"
-          );
-        }
-      }
-    );
-
-  await new Promise((resolve, reject) => {
-    channel.subscribe((state) => {
-      if (state === "SUBSCRIBED") resolve();
-
-      if (state === "CHANNEL_ERROR" ||
-          state === "TIMED_OUT") {
-        reject(new Error("No se pudo conectar Realtime"));
-      }
-    });
-  });
+  if (te) throw te;
+  treasures = t || [];
+  render();
 }
 
-// ENTRAR A LA ISLA
 async function joinGame() {
-  if (currentPlayer) return;
-
-  const name = document
-    .getElementById("playerName")
-    .value.trim();
-
-  currentRoom = document
-    .getElementById("roomCode")
-    .value.trim();
-
-  if (!name || !currentRoom) {
-    showMessage("Escribe tu nombre y el código de la isla.");
-    return;
-  }
-
-  if (
-    SUPABASE_URL.includes("PEGA_AQUI") ||
-    SUPABASE_KEY.includes("PEGA_AQUI")
-  ) {
-    showMessage("Primero configura los datos de Supabase.");
-    return;
-  }
-
-  joinButton.disabled = true;
-  status.textContent = "Conectando...";
-
   try {
-    // Identificador para recuperar al mismo jugador
-    const storageKey = "treasure-player-" + currentRoom;
-    let savedId = localStorage.getItem(storageKey);
+    const nameInput = $("playerName") || $("player-name") || $("name");
+    const name = nameInput?.value.trim() || "Pirata";
 
-    let existingPlayer = null;
+    message("Conectando...");
+
+    const savedId = localStorage.getItem("treasure_player_id");
 
     if (savedId) {
-      const { data } = await db
+      const { data } = await supabaseClient
         .from("game_players")
         .select("*")
         .eq("id", savedId)
-        .eq("room_code", currentRoom)
         .maybeSingle();
 
-      existingPlayer = data;
+      if (data) player = data;
     }
 
-    if (existingPlayer) {
-      currentPlayer = existingPlayer;
-      currentPlayer.player_name = name;
-
-      const { error } = await db
-        .from("game_players")
-        .update({ player_name: name })
-        .eq("id", currentPlayer.id);
-
-      if (error) throw error;
-
-    } else {
-      // Elegir el primer puesto disponible
-      const { data, error } = await db
+    if (!player) {
+      const { data: existing, error } = await supabaseClient
         .from("game_players")
         .select("role")
-        .eq("room_code", currentRoom);
+        .eq("room_code", ROOM);
 
       if (error) throw error;
 
-      const occupied = data.map(player => player.role);
+      const used = (existing || []).map(p => p.role);
+      const role = !used.includes("red") ? "red" : "blue";
 
-      const role = !occupied.includes("red")
-        ? "red"
-        : !occupied.includes("blue")
-        ? "blue"
-        : null;
-
-      if (!role) {
-        throw new Error("La isla ya tiene dos jugadores.");
+      if (used.includes("red") && used.includes("blue")) {
+        throw new Error("La partida ya tiene dos jugadores. Usa otro navegador o recupera tu partida.");
       }
 
       const newPlayer = {
         id: crypto.randomUUID(),
-        room_code: currentRoom,
+        room_code: ROOM,
         player_name: name,
         role,
-        x: role === "red" ? 25 : 65,
-        y: 45,
+        x: role === "red" ? 15 : 80,
+        y: 50,
         score: 0
       };
 
-      const { data: inserted, error: insertError } =
-        await db
-          .from("game_players")
-          .insert(newPlayer)
-          .select()
-          .single();
+      const { data, error: insertError } = await supabaseClient
+        .from("game_players")
+        .insert(newPlayer)
+        .select()
+        .single();
 
       if (insertError) throw insertError;
 
-      currentPlayer = inserted;
-      localStorage.setItem(storageKey, inserted.id);
+      player = data;
+      localStorage.setItem("treasure_player_id", player.id);
+    } else {
+      const { data, error } = await supabaseClient
+        .from("game_players")
+        .update({ player_name: name })
+        .eq("id", player.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      player = data;
     }
 
-    await loadGameData();
-    await connectRealtime();
+    await loadData();
+    await subscribeToChanges();
 
-    status.textContent = "Conectado a la isla";
-    showMessage(
-      "¡Bienvenido " + name +
-      "! Eres el pirata " +
-      (currentPlayer.role === "red" ? "rojo" : "azul") + "."
-    );
-
-    joinButton.textContent = "¡Estás jugando!";
-
+    message(`¡Bienvenido, ${player.player_name}! Eres el jugador ${player.role}.`);
+    showControls();
   } catch (error) {
     console.error(error);
-    currentPlayer = null;
-    joinButton.disabled = false;
-    status.textContent = "Error de conexión";
-    showMessage(error.message);
+    message("Error: " + error.message);
   }
 }
 
-// GUARDAR MOVIMIENTO Y PUNTOS
-async function savePlayer() {
-  if (!currentPlayer) return;
+function showControls() {
+  const controls = $("controls");
+  if (controls) controls.style.display = "block";
+}
 
-  const { error } = await db
+async function move(dx, dy) {
+  if (!player) return;
+
+  const updated = {
+    x: Math.max(0, Math.min(95, Number(player.x) + dx)),
+    y: Math.max(0, Math.min(90, Number(player.y) + dy))
+  };
+
+  const { data, error } = await supabaseClient
     .from("game_players")
-    .update({
-      x: currentPlayer.x,
-      y: currentPlayer.y,
-      score: currentPlayer.score
-    })
-    .eq("id", currentPlayer.id);
+    .update(updated)
+    .eq("id", player.id)
+    .select()
+    .single();
 
   if (error) {
-    console.error(error);
-    showMessage("No se pudo guardar el movimiento.");
+    message(error.message);
     return;
   }
 
-  players[currentPlayer.role] = currentPlayer;
-  renderPlayers();
-
-  await channel.send({
-    type: "broadcast",
-    event: "player_update",
-    payload: currentPlayer
-  });
+  player = data;
+  await loadData();
 }
 
-// MOVER PIRATA
-async function movePlayer(direction) {
-  if (!currentPlayer) {
-    showMessage("Primero entra a la isla.");
-    return;
-  }
+async function collectTreasure() {
+  if (!player) return;
 
-  const step = 7;
-
-  if (direction === "up") currentPlayer.y -= step;
-  if (direction === "down") currentPlayer.y += step;
-  if (direction === "left") currentPlayer.x -= step;
-  if (direction === "right") currentPlayer.x += step;
-
-  currentPlayer.x = Math.max(
-    5, Math.min(90, currentPlayer.x)
+  const available = TREASURES.find(t =>
+    !treasures.some(found => found.treasure_id === t.id) &&
+    Math.abs(t.x - Number(player.x)) < 16 &&
+    Math.abs(t.y - Number(player.y)) < 16
   );
 
-  currentPlayer.y = Math.max(
-    5, Math.min(85, currentPlayer.y)
-  );
-
-  renderPlayers();
-  await savePlayer();
-}
-
-// BUSCAR TESOROS
-async function findTreasure() {
-  if (!currentPlayer) {
-    showMessage("Primero entra a la isla.");
+  if (!available) {
+    message("Acércate a un tesoro para recogerlo.");
     return;
   }
 
-  const nearby = treasures.find(treasure => {
-    const distance = Math.hypot(
-      treasure.x - currentPlayer.x,
-      treasure.y - currentPlayer.y
-    );
-
-    return !treasure.found && distance < 13;
-  });
-
-  if (!nearby) {
-    showMessage("No hay tesoros cerca. ¡Sigue explorando!");
-    return;
-  }
-
-  // Intentar guardar el tesoro.
-  // La restricción UNIQUE evita que se reclame dos veces.
-  const { error } = await db
+  const { error } = await supabaseClient
     .from("game_treasures")
     .insert({
-      room_code: currentRoom,
-      treasure_id: nearby.id,
-      player_role: currentPlayer.role,
-      player_name: currentPlayer.player_name
+      room_code: ROOM,
+      treasure_id: available.id,
+      player_role: player.role,
+      player_name: player.player_name
     });
 
   if (error) {
-    if (error.code === "23505") {
-      nearby.found = true;
-      renderTreasures();
-      showMessage("¡Ese tesoro ya fue encontrado!");
-      return;
-    }
-
-    console.error(error);
-    showMessage("No se pudo guardar el tesoro.");
+    message("Ese tesoro ya fue encontrado.");
+    await loadData();
     return;
   }
 
-  nearby.found = true;
-  currentPlayer.score += 10;
+  const { data, error: updateError } = await supabaseClient
+    .from("game_players")
+    .update({ score: Number(player.score) + 1 })
+    .eq("id", player.id)
+    .select()
+    .single();
 
-  renderTreasures();
+  if (updateError) {
+    message(updateError.message);
+    return;
+  }
 
-  await savePlayer();
-
-  await channel.send({
-    type: "broadcast",
-    event: "treasure_update",
-    payload: {
-      treasure_id: nearby.id,
-      player_name: currentPlayer.player_name
-    }
-  });
-
-  addActivity(
-    currentPlayer.player_name + " encontró un tesoro (+10)"
-  );
-
-  showMessage("¡Tesoro encontrado! Ganaste 10 puntos.");
+  player = data;
+  await loadData();
+  message("¡Encontraste un tesoro!");
 }
 
-// BOTONES
-document.querySelectorAll("[data-move]").forEach(button => {
-  button.addEventListener("click", () => {
-    movePlayer(button.dataset.move);
-  });
+async function subscribeToChanges() {
+  supabaseClient
+    .channel("isla-principal")
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "game_players",
+      filter: `room_code=eq.${ROOM}`
+    }, loadData)
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "game_treasures",
+      filter: `room_code=eq.${ROOM}`
+    }, loadData)
+    .subscribe();
+}
+
+function connectButton(id, callback) {
+  const el = $(id);
+  if (el) el.addEventListener("click", callback);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  connectButton("joinBtn", joinGame);
+  connectButton("join-button", joinGame);
+  connectButton("joinGame", joinGame);
+  connectButton("up", () => move(0, -5));
+  connectButton("down", () => move(0, 5));
+  connectButton("left", () => move(-5, 0));
+  connectButton("right", () => move(5, 0));
+  connectButton("collectBtn", collectTreasure);
+  connectButton("collect", collectTreasure);
 });
-
-joinButton.addEventListener("click", joinGame);
-findButton.addEventListener("click", findTreasure);
-
-// INICIO
-pirateA.style.display = "none";
-pirateB.style.display = "none";
-
-treasures = treasurePositions.map(treasure => ({
-  ...treasure,
-  found: false
-}));
-
-renderTreasures();
-showMessage("¡La isla está lista! Entra para jugar.");
