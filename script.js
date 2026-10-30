@@ -268,6 +268,45 @@ async function sendMessage() {
 }
 
 $("submit-conclusion").addEventListener("click", async () => {
+  const suspect = $("final-suspect").value;
+
+  if (!suspect) {
+    message("final-message", "Primero elige a un sospechoso.");
+    return;
+  }
+
+  try {
+    $("submit-conclusion").disabled = true;
+
+    const { data, error } = await supabaseClient.rpc("submit_guess", {
+      p_room_id: currentRoom,
+      p_suspect: suspect
+    });
+
+    if (error) throw error;
+
+    if (!data.success) {
+      message("final-message", data.message);
+      return;
+    }
+
+    if (data.correct) {
+      message("final-message",
+        `🎉 ¡Correcto! Sofía movió el trofeo. ¡Ganaste 10 puntos! Tu puntuación: ${data.score}`);
+    } else {
+      message("final-message",
+        `❌ No es correcto. La respuesta era Sofía. Tu puntuación: ${data.score}`);
+    }
+
+    $("final-suspect").disabled = true;
+    await loadPlayers();
+
+  } catch (error) {
+    message("final-message", error.message);
+  } finally {
+    $("submit-conclusion").disabled = false;
+  }
+});
   const suspect = $("final-suspect").value.trim();
   const reason = $("final-reason").value.trim();
 
