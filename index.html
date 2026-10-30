@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#123b35">
-  <title>Treasure Island | Búsqueda del Tesoro</title>
+  <title>Treasure Island | Carrera del Tesoro</title>
 
   <link rel="stylesheet" href="style.css">
 
@@ -19,7 +19,7 @@
     <div>
       <p class="eyebrow">AVENTURA MULTIJUGADOR</p>
       <h1>🏝️ Treasure Island</h1>
-      <p class="subtitle">¡Encuentra los tesoros antes que tu rival!</p>
+      <p class="subtitle">¡Compite, recoge tesoros y llega a la meta!</p>
     </div>
 
     <div id="connectionStatus" class="status">
@@ -48,6 +48,38 @@
       </p>
     </section>
 
+    <!-- SALA DE ESPERA -->
+    <section id="waitingRoom" class="panel waiting-room">
+      <h2>⚓ Sala de espera</h2>
+      <p>Los dos capitanes deben estar listos para comenzar la carrera.</p>
+
+      <div class="ready-players">
+
+        <div class="ready-card red-card">
+          <span>🏴‍☠️ Capitán Rojo</span>
+          <strong id="readyA">Esperando...</strong>
+        </div>
+
+        <div class="ready-card blue-card">
+          <span>🏴‍☠️ Capitán Azul</span>
+          <strong id="readyB">Esperando...</strong>
+        </div>
+
+      </div>
+
+      <button id="readyButton" class="primary-button" type="button" disabled>
+        ¡Estoy listo!
+      </button>
+
+      <p id="readyMessage" class="helper">
+        Entra a la isla para prepararte.
+      </p>
+
+      <div id="countdownDisplay" class="countdown" hidden>
+        5
+      </div>
+    </section>
+
     <!-- ZONA PRINCIPAL DEL JUEGO -->
     <section class="game-layout">
 
@@ -56,7 +88,7 @@
         <div class="section-heading">
           <div>
             <h2>🗺️ Mapa del tesoro</h2>
-            <p>Explora la isla y encuentra los cofres.</p>
+            <p>Recoge cofres y corre hacia la meta.</p>
           </div>
 
           <span class="map-tag">ISLA 01</span>
@@ -86,6 +118,11 @@
             <span class="treasure" style="left:76%;top:30%">🧰</span>
             <span class="treasure" style="left:35%;top:72%">🧰</span>
             <span class="treasure" style="left:72%;top:76%">🧰</span>
+          </div>
+
+          <!-- META -->
+          <div id="finishLine" class="finish-line">
+            🏁 META
           </div>
 
           <!-- JUGADORES -->
@@ -126,7 +163,7 @@
 
           <h3>
             ⏱️ Tiempo restante:
-            <span id="timerDisplay">03:00</span>
+            <span id="timerDisplay">06:00</span>
           </h3>
 
           <button id="restartButton" type="button">
@@ -178,6 +215,12 @@
           <li>Los tesoros aparecerán aquí.</li>
         </ul>
 
+        <!-- RESULTADO FINAL -->
+        <div id="finalResult" class="final-result" hidden>
+          <h2>🏆 Resultado final</h2>
+          <p id="winnerMessage"></p>
+        </div>
+
       </aside>
 
     </section>
@@ -189,12 +232,12 @@
 
       <ol>
         <li>Escribe tu nombre y entra a la isla.</li>
-        <li>Abre la misma dirección en otro navegador para jugar con otra persona.</li>
-        <li>Muévete usando las flechas o los botones.</li>
-        <li>Evita las rocas y los árboles.</li>
-        <li>Acércate a un cofre y pulsa Buscar tesoro.</li>
-        <li>Consigue más puntos antes de que termine el tiempo.</li>
-        <li>Puedes reiniciar o abandonar la partida.</li>
+        <li>Comparte el código de la isla con el otro jugador.</li>
+        <li>Los dos capitanes deben pulsar ¡Estoy listo!</li>
+        <li>Cuando ambos estén preparados, comienza la cuenta regresiva.</li>
+        <li>Recoge cofres, evita obstáculos y llega a la meta.</li>
+        <li>La carrera dura seis minutos.</li>
+        <li>Al finalizar, gana quien haya conseguido más tesoros.</li>
       </ol>
 
     </section>
