@@ -1,1 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#123b35">
+  <title>Treasure Island | Búsqueda del Tesoro</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <div>
+      <p class="eyebrow">AVENTURA MULTIJUGADOR</p>
+      <h1>🏝️ Treasure Island</h1>
+      <p class="subtitle">¡Encuentra los tesoros antes que tu rival!</p>
+    </div>
+    <div id="connectionStatus" class="status">Preparando aventura...</div>
+  </header>
 
+  <main class="container">
+    <section class="panel setup-panel">
+      <h2>⚓ Tu expedición</h2>
+      <label for="playerName">Nombre del pirata</label>
+      <input id="playerName" maxlength="20" placeholder="Ej. Capitán Ana">
+
+      <label for="roomCode">Código de la isla</label>
+      <input id="roomCode" maxlength="30" value="isla-principal">
+
+      <button id="joinButton" class="primary-button">Entrar a la isla</button>
+      <p id="playerInfo" class="helper">Elige un nombre y entra a jugar.</p>
+    </section>
+
+    <section class="game-layout">
+      <div class="panel island-panel">
+        <div class="section-heading">
+          <div>
+            <h2>🗺️ Mapa del tesoro</h2>
+            <p>Explora la isla y encuentra los cofres.</p>
+          </div>
+          <span class="map-tag">ISLA 01</span>
+        </div>
+
+        <div id="island" class="island" aria-label="Mapa de la isla">
+          <div class="island-decoration palm palm-one">🌴</div>
+          <div class="island-decoration palm palm-two">🌴</div>
+          <div class="island-decoration rock">🪨</div>
+          <div class="island-decoration ship">⛵</div>
+          <div id="treasureArea"></div>
+          <div id="pirateA" class="pirate pirate-red" title="Jugador rojo">🏴‍☠️</div>
+          <div id="pirateB" class="pirate pirate-blue" title="Jugador azul">🏴‍☠️</div>
+        </div>
+
+        <p class="helper">Usa los botones para moverte. Acércate a un cofre y pulsa «Buscar tesoro».</p>
+
+        <div class="controls">
+          <button data-move="up" aria-label="Mover arriba">⬆️</button>
+          <div>
+            <button data-move="left" aria-label="Mover izquierda">⬅️</button>
+            <button data-move="down" aria-label="Mover abajo">⬇️</button>
+            <button data-move="right" aria-label="Mover derecha">➡️</button>
+          </div>
+          <button id="findTreasureButton" class="treasure-button">🔎 Buscar tesoro</button>
+        </div>
+        <p id="gameMessage" class="message" role="status">¡Bienvenido a la isla!</p>
+      </div>
+
+      <aside class="panel scoreboard">
+        <h2>🏆 Marcador</h2>
+        <div class="score-card red-card">
+          <div class="player-symbol">🏴‍☠️</div>
+          <div>
+            <h3 id="nameA">Pirata Rojo</h3>
+            <p>Jugador 1</p>
+          </div>
+          <strong id="scoreA">0</strong>
+        </div>
+
+        <div class="score-card blue-card">
+          <div class="player-symbol">🏴‍☠️</div>
+          <div>
+            <h3 id="nameB">Pirata Azul</h3>
+            <p>Jugador 2</p>
+          </div>
+          <strong id="scoreB">0</strong>
+        </div>
+
+        <h3 class="activity-title">📜 Últimos hallazgos</h3>
+        <ul id="activityList" class="activity-list">
+          <li>Los tesoros aparecerán aquí.</li>
+        </ul>
+      </aside>
+    </section>
+
+    <section class="panel instructions">
+      <h2>📖 Cómo jugar</h2>
+      <ol>
+        <li>Escribe tu nombre y entra a la isla.</li>
+        <li>Abre la misma dirección en otro navegador para probar con otro jugador.</li>
+        <li>Muévete por el mapa y busca tesoros.</li>
+        <li>Los puntos y hallazgos se guardarán en Supabase cuando esté configurado.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>Treasure Island · Laboratorio 4 · Proyecto educativo</footer>
+</body>
+</html>
