@@ -1,5 +1,8 @@
 
-// TREASURE ISLAND - LABORATORIO 4
+// ============================================
+// TREASURE ISLAND - CARRERA DEL GRAN TESORO
+// LABORATORIO 4
+// ============================================
 
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
@@ -11,7 +14,8 @@ const supabaseClient = window.supabase.createClient(
 
 const $ = (id) => document.getElementById(id);
 
-const GAME_DURATION = 180;
+const GAME_DURATION = 360;
+const COUNTDOWN_DURATION = 5;
 
 const TREASURES = [
   { id: 1, x: 18, y: 25 },
@@ -24,17 +28,25 @@ const TREASURES = [
 const OBSTACLES = [
   { x: 25, y: 45 },
   { x: 55, y: 55 },
-  { x: 82, y: 65 }
+  { x: 82, y: 65 },
+  { x: 40, y: 35 }
 ];
 
 let currentPlayer = null;
 let roomCode = "";
 let roomPlayers = [];
 let roomClaims = [];
-let channel = null;
+let roomStatus = "waiting";
 let startedAt = null;
+let channel = null;
 let busy = false;
 let timerInterval = null;
+let finishingPlayer = false;
+let advancingRoom = false;
+
+// ============================================
+// MENSAJES Y ESTADO
+// ============================================
 
 function setMessage(message) {
   $("gameMessage").textContent = message;
@@ -50,8 +62,30 @@ function storageKey(room) {
   return "treasure_island_player_" + room;
 }
 
+function getPlayer(role) {
+  return roomPlayers.find(p => p.role === role);
+}
+
+// ============================================
+// TIEMPO
+// ============================================
+
 function remainingTime() {
-  if (!startedAt) return GAME_DURATION;
+  if (!startedAt || roomStatus === "waiting") {
+    return GAME_DURATION;
+  }
+
+  const difference = Math.ceil(
+    (new Date(startedAt).getTime() - Date.now()) / 1000
+  );
+
+  if (roomStatus === "countdown") {
+    return Math.max(0, difference);
+  }
+
+  if (roomStatus === "finished") {
+    return 0;
+  }
 
   const elapsed = Math.floor(
     (Date.now() - new Date(startedAt).getTime()) / 1000
@@ -61,92 +95,169 @@ function remainingTime() {
 }
 
 function updateTimer() {
+  const timer = $("timerDisplay");
+  const countdown = $("countdownDisplay");
+
+  if (roomStatus === "waiting") {
+    timer.textContent = "06:00";
+    countdown.hidden = true;
+    return;
+  }
+
+  if (roomStatus === "countdown") {
+    const seconds = remainingTime();
+
+    countdown.hidden = false;
+    countdown.textContent = String(seconds);
+
+    timer.textContent = "06:00";
+
+    if (seconds <= 0) {
+      countdown.hidden = true;
+      advanceRoomState();
+    }
+
+    return;
+  }
+
+  countdown.hidden = true;
+
   const remaining = remainingTime();
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
 
-  $("timerDisplay").textContent =
+  timer.textContent =
     String(minutes).padStart(2, "0") + ":" +
     String(seconds).padStart(2, "0");
 
-  if (remaining === 0 && currentPlayer) {
-    setMessage("¡Se acabó el tiempo! La partida ha terminado.");
+  if (remaining <= 0 && roomStatus === "racing") {
+    finishRace();
   }
 }
 
 function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
 
   updateTimer();
   timerInterval = setInterval(updateTimer, 1000);
 }
 
-async function loadRoomTimer() {
-  const { data, error } = await supabaseClient
-    .from("treasure_rooms")
-    .select("started_at")
-    .eq("room_code", roomCode)
-    .maybeSingle();
-
-  if (error) throw error;
-
-  if (data) {
-    startedAt = data.started_at;
-    updateTimer();
-  }
-}
+// ============================================
+// SALA Y DATOS COMPARTIDOS
+// ============================================
 
 async function ensureRoom() {
   const { data, error } = await supabaseClient
     .from("treasure_rooms")
-    .select("started_at")
+    .select("*")
     .eq("room_code", roomCode)
     .maybeSingle();
 
   if (error) throw error;
 
-  if (data) {
-    startedAt = data.started_at;
-  } else {
+  if (!data) {
     const { error: insertError } = await supabaseClient
       .from("treasure_rooms")
-      .insert({ room_code: roomCode });
+      .insert({
+        room_code: roomCode,
+        status: "waiting"
+      });
 
     if (insertError && insertError.code !== "23505") {
       throw insertError;
     }
-
-    await loadRoomTimer();
   }
-
-  startTimer();
 }
 
 async function loadRoom() {
-  const [playersResult, claimsResult] = await Promise.all([
-    supabaseClient.from("treasure_players")
-      .select("*")
-      .eq("room_code", roomCode),
+  if (!roomCode) return;
 
-    supabaseClient.from("treasure_claims")
-      .select("*")
-      .eq("room_code", roomCode)
-      .order("created_at", { ascending: false })
-      .limit(12)
-  ]);
+  const [playersResult, claimsResult, roomResult] =
+    await Promise.all([
+      supabaseClient
+        .from("treasure_players")
+        .select("*")
+        .eq("room_code", roomCode),
+
+      supabaseClient
+        .from("treasure_claims")
+        .select("*")
+        .eq("room_code", roomCode)
+        .order("created_at", { ascending: false }),
+
+      supabaseClient
+        .from("treasure_rooms")
+        .select("*")
+        .eq("room_code", roomCode)
+        .maybeSingle()
+    ]);
 
   if (playersResult.error) throw playersResult.error;
   if (claimsResult.error) throw claimsResult.error;
+  if (roomResult.error) throw roomResult.error;
 
   roomPlayers = playersResult.data || [];
   roomClaims = claimsResult.data || [];
 
+  if (roomResult.data) {
+    roomStatus = roomResult.data.status;
+    startedAt = roomResult.data.started_at;
+  }
+
   render();
+  updateTimer();
+
+  await advanceRoomState();
 }
 
+async function advanceRoomState() {
+  if (advancingRoom || !roomCode || !startedAt) return;
+
+  advancingRoom = true;
+
+  try {
+    const now = Date.now();
+    const start = new Date(startedAt).getTime();
+
+    if (
+      roomStatus === "countdown" &&
+      now >= start
+    ) {
+      const { error } = await supabaseClient
+        .from("treasure_rooms")
+        .update({ status: "racing" })
+        .eq("room_code", roomCode)
+        .eq("status", "countdown");
+
+      if (error) throw error;
+
+      roomStatus = "racing";
+      setMessage("¡La carrera ha comenzado! ¡A por los tesoros!");
+      render();
+    }
+
+    if (
+      roomStatus === "racing" &&
+      now >= start + GAME_DURATION * 1000
+    ) {
+      await finishRace();
+    }
+  } catch (error) {
+    console.error("Error actualizando la carrera:", error);
+  } finally {
+    advancingRoom = false;
+  }
+}
+
+// ============================================
+// DIBUJAR EL JUEGO
+// ============================================
+
 function render() {
-  const red = roomPlayers.find(p => p.role === "red");
-  const blue = roomPlayers.find(p => p.role === "blue");
+  const red = getPlayer("red");
+  const blue = getPlayer("blue");
 
   $("nameA").textContent = red?.player_name || "Pirata Rojo";
   $("nameB").textContent = blue?.player_name || "Pirata Azul";
@@ -154,8 +265,8 @@ function render() {
   $("scoreA").textContent = red?.score ?? 0;
   $("scoreB").textContent = blue?.score ?? 0;
 
-  $("pirateA").style.display = red ? "block" : "none";
-  $("pirateB").style.display = blue ? "block" : "none";
+  $("pirateA").style.display = red ? "grid" : "none";
+  $("pirateB").style.display = blue ? "grid" : "none";
 
   if (red) {
     $("pirateA").style.left = red.x + "%";
@@ -167,7 +278,10 @@ function render() {
     $("pirateB").style.top = blue.y + "%";
   }
 
-  const claimed = new Set(roomClaims.map(c => c.treasure_id));
+  // Cofres que todavía no han sido recogidos
+  const claimed = new Set(
+    roomClaims.map(c => Number(c.treasure_id))
+  );
 
   $("treasureArea").innerHTML = TREASURES
     .filter(t => !claimed.has(t.id))
@@ -175,29 +289,133 @@ function render() {
       `<span class="treasure" style="left:${t.x}%;top:${t.y}%">🧰</span>`
     ).join("");
 
+  // Actividad
   const activity = $("activityList");
   activity.innerHTML = "";
 
   if (!roomClaims.length) {
     const li = document.createElement("li");
-    li.textContent = "Los tesoros aparecerán aquí.";
+    li.textContent = "¡Los tesoros esperan a los capitanes!";
     activity.appendChild(li);
   } else {
-    roomClaims.forEach(claim => {
+    roomClaims.slice(0, 12).forEach(claim => {
       const li = document.createElement("li");
-      li.textContent = claim.player_name + " encontró un tesoro.";
+      li.textContent =
+        claim.player_name + " encontró un tesoro.";
       activity.appendChild(li);
     });
   }
+
+  renderWaitingRoom();
+  renderFinalResult();
 }
+
+// ============================================
+// SALA DE ESPERA
+// ============================================
+
+function renderWaitingRoom() {
+  const red = getPlayer("red");
+  const blue = getPlayer("blue");
+
+  const readyA = $("readyA");
+  const readyB = $("readyB");
+  const readyButton = $("readyButton");
+
+  readyA.textContent = red?.is_ready ? "✓ ¡Listo!" : "Esperando...";
+  readyB.textContent = blue?.is_ready ? "✓ ¡Listo!" : "Esperando...";
+
+  readyA.className = red?.is_ready ? "ready" : "waiting";
+  readyB.className = blue?.is_ready ? "ready" : "waiting";
+
+  const joined = Boolean(currentPlayer);
+  const alreadyReady = Boolean(currentPlayer?.is_ready);
+
+  readyButton.disabled =
+    !joined ||
+    alreadyReady ||
+    roomStatus !== "waiting";
+
+  readyButton.textContent = alreadyReady
+    ? "✓ Ya estás listo"
+    : "¡Estoy listo!";
+
+  if (roomStatus === "waiting") {
+    if (!red || !blue) {
+      $("readyMessage").textContent =
+        "Esperando a que entren los dos capitanes.";
+    } else if (red.is_ready && blue.is_ready) {
+      $("readyMessage").textContent =
+        "¡Los dos están listos! Preparando la carrera...";
+    } else {
+      $("readyMessage").textContent =
+        "Cuando los dos estén listos, comenzará la cuenta regresiva.";
+    }
+  } else if (roomStatus === "countdown") {
+    $("readyMessage").textContent =
+      "¡Prepárense! La carrera está por comenzar.";
+  } else if (roomStatus === "racing") {
+    $("readyMessage").textContent =
+      "¡La carrera está en marcha!";
+  } else {
+    $("readyMessage").textContent =
+      "La carrera ha terminado.";
+  }
+}
+
+async function markReady() {
+  if (!currentPlayer || busy) return;
+
+  if (roomStatus !== "waiting") {
+    setMessage("La carrera ya está en marcha o ha terminado.");
+    return;
+  }
+
+  busy = true;
+  $("readyButton").disabled = true;
+
+  try {
+    const { error } = await supabaseClient.rpc(
+      "set_player_ready",
+      {
+        p_room_code: roomCode,
+        p_player_id: currentPlayer.id,
+        p_ready: true
+      }
+    );
+
+    if (error) throw error;
+
+    currentPlayer.is_ready = true;
+
+    await loadRoom();
+
+    setMessage("¡Estás listo! Esperando al otro capitán.");
+  } catch (error) {
+    console.error(error);
+    setMessage("No se pudo marcar como listo: " + error.message);
+  } finally {
+    busy = false;
+    renderWaitingRoom();
+  }
+}
+
+// ============================================
+// ENTRAR A LA ISLA
+// ============================================
 
 async function joinIsland() {
   if (busy) return;
 
-  const playerName = $("playerName").value.trim().slice(0, 20);
+  const playerName = $("playerName").value
+    .trim()
+    .slice(0, 20);
 
-  roomCode = $("roomCode").value.trim().toLowerCase()
-    .replace(/[^a-z0-9-]/g, "").slice(0, 30);
+  roomCode = $("roomCode").value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 30);
 
   if (!playerName || !roomCode) {
     setMessage("Escribe tu nombre y el código de la isla.");
@@ -206,9 +424,12 @@ async function joinIsland() {
 
   busy = true;
   $("joinButton").disabled = true;
+
   currentPlayer = null;
 
   try {
+    await ensureRoom();
+
     const savedId = localStorage.getItem(storageKey(roomCode));
 
     if (savedId) {
@@ -216,13 +437,15 @@ async function joinIsland() {
         .from("treasure_players")
         .select("*")
         .eq("id", savedId)
+        .eq("room_code", roomCode)
         .maybeSingle();
 
       if (error) throw error;
 
       if (data) {
         const { data: updated, error: updateError } =
-          await supabaseClient.from("treasure_players")
+          await supabaseClient
+            .from("treasure_players")
             .update({
               player_name: playerName,
               updated_at: new Date().toISOString()
@@ -232,6 +455,7 @@ async function joinIsland() {
             .single();
 
         if (updateError) throw updateError;
+
         currentPlayer = updated;
       }
     }
@@ -244,9 +468,13 @@ async function joinIsland() {
 
       if (error) throw error;
 
-      const taken = new Set((existing || []).map(p => p.role));
-      const role = !taken.has("red") ? "red" :
-        (!taken.has("blue") ? "blue" : null);
+      const taken = new Set(
+        (existing || []).map(p => p.role)
+      );
+
+      const role = !taken.has("red")
+        ? "red"
+        : (!taken.has("blue") ? "blue" : null);
 
       if (!role) {
         setMessage("La isla ya tiene dos jugadores.");
@@ -260,9 +488,11 @@ async function joinIsland() {
           room_code: roomCode,
           player_name: playerName,
           role,
-          x: role === "red" ? 15 : 75,
-          y: 50,
-          score: 0
+          x: role === "red" ? 8 : 8,
+          y: role === "red" ? 25 : 75,
+          score: 0,
+          is_ready: false,
+          finished_at: null
         })
         .select()
         .single();
@@ -270,10 +500,10 @@ async function joinIsland() {
       if (insertError) throw insertError;
 
       currentPlayer = data;
+
       localStorage.setItem(storageKey(roomCode), data.id);
     }
 
-    await ensureRoom();
     await loadRoom();
 
     $("playerInfo").textContent =
@@ -282,8 +512,9 @@ async function joinIsland() {
 
     subscribeToRoom();
 
-    setMessage("¡Aventura iniciada!");
-    setStatus("Conectado a la isla", true);
+    setStatus("Conectado · " + roomCode, true);
+
+    setMessage("¡Bienvenido! Prepárate en la sala de espera.");
 
   } catch (error) {
     console.error(error);
@@ -292,40 +523,59 @@ async function joinIsland() {
   } finally {
     busy = false;
     $("joinButton").disabled = false;
+    renderWaitingRoom();
   }
 }
 
-function subscribeToRoom() {
-  if (channel) supabaseClient.removeChannel(channel);
+// ============================================
+// SINCRONIZACIÓN EN TIEMPO REAL
+// ============================================
 
-  channel = supabaseClient.channel("treasure-room-" + roomCode)
+function subscribeToRoom() {
+  if (channel) {
+    supabaseClient.removeChannel(channel);
+  }
+
+  channel = supabaseClient
+    .channel("treasure-room-" + roomCode)
+
     .on("postgres_changes", {
       event: "*",
       schema: "public",
       table: "treasure_players",
       filter: "room_code=eq." + roomCode
-    }, () => loadRoom().catch(console.error))
+    }, () => {
+      loadRoom().catch(console.error);
+    })
+
     .on("postgres_changes", {
       event: "*",
       schema: "public",
       table: "treasure_claims",
       filter: "room_code=eq." + roomCode
-    }, () => loadRoom().catch(console.error))
+    }, () => {
+      loadRoom().catch(console.error);
+    })
+
     .on("postgres_changes", {
       event: "*",
       schema: "public",
       table: "treasure_rooms",
       filter: "room_code=eq." + roomCode
     }, () => {
-      loadRoomTimer().catch(console.error);
       loadRoom().catch(console.error);
     })
+
     .subscribe(status => {
       if (status === "SUBSCRIBED") {
         setStatus("En línea · " + roomCode, true);
       }
     });
 }
+
+// ============================================
+// MOVIMIENTO Y OBSTÁCULOS
+// ============================================
 
 function hitsObstacle(x, y) {
   return OBSTACLES.some(obstacle =>
@@ -335,7 +585,14 @@ function hitsObstacle(x, y) {
 
 async function movePlayer(direction) {
   if (!currentPlayer || busy) {
-    if (!currentPlayer) setMessage("Primero entra a la isla.");
+    if (!currentPlayer) {
+      setMessage("Primero entra a la isla.");
+    }
+    return;
+  }
+
+  if (roomStatus !== "racing") {
+    setMessage("Espera a que comience la carrera.");
     return;
   }
 
@@ -344,18 +601,30 @@ async function movePlayer(direction) {
     return;
   }
 
+  if (currentPlayer.finished_at) {
+    setMessage("¡Ya llegaste a la meta!");
+    return;
+  }
+
   const steps = {
-    up: [0, -8],
-    down: [0, 8],
-    left: [-8, 0],
-    right: [8, 0]
+    up: [0, -6],
+    down: [0, 6],
+    left: [-6, 0],
+    right: [6, 0]
   };
 
   const delta = steps[direction];
   if (!delta) return;
 
-  const x = Math.max(5, Math.min(90, Number(currentPlayer.x) + delta[0]));
-  const y = Math.max(8, Math.min(82, Number(currentPlayer.y) + delta[1]));
+  const x = Math.max(
+    5,
+    Math.min(94, Number(currentPlayer.x) + delta[0])
+  );
+
+  const y = Math.max(
+    8,
+    Math.min(92, Number(currentPlayer.y) + delta[1])
+  );
 
   if (hitsObstacle(x, y)) {
     setMessage("¡Cuidado! Hay un obstáculo en ese camino.");
@@ -379,28 +648,75 @@ async function movePlayer(direction) {
     if (error) throw error;
 
     currentPlayer = data;
+
+    // Llegada a la meta
+    if (x >= 88) {
+      await markFinished();
+      return;
+    }
+
     await loadRoom();
-    setMessage("¡Movimiento guardado!");
+
   } catch (error) {
+    console.error(error);
     setMessage("Error al mover: " + error.message);
   } finally {
     busy = false;
   }
 }
 
+// ============================================
+// LLEGADA A LA META
+// ============================================
+
+async function markFinished() {
+  if (!currentPlayer || currentPlayer.finished_at) return;
+
+  const { data, error } = await supabaseClient
+    .from("treasure_players")
+    .update({
+      x: 90,
+      finished_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", currentPlayer.id)
+    .is("finished_at", null)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  currentPlayer = data;
+
+  await loadRoom();
+
+  setMessage("🏁 ¡Has llegado a la meta! Espera el resultado final.");
+}
+
+// ============================================
+// RECOGER TESOROS
+// ============================================
+
 async function findTreasure() {
   if (!currentPlayer || busy) {
-    if (!currentPlayer) setMessage("Primero entra a la isla.");
+    if (!currentPlayer) {
+      setMessage("Primero entra a la isla.");
+    }
     return;
   }
 
-  if (remainingTime() <= 0) {
-    setMessage("¡Se acabó el tiempo!");
+  if (roomStatus !== "racing" || remainingTime() <= 0) {
+    setMessage("Espera a que comience la carrera.");
     return;
   }
 
-  const available = TREASURES.filter(
-    t => !roomClaims.some(c => c.treasure_id === t.id)
+  if (currentPlayer.finished_at) {
+    setMessage("¡Ya llegaste a la meta!");
+    return;
+  }
+
+  const available = TREASURES.filter(t =>
+    !roomClaims.some(c => Number(c.treasure_id) === t.id)
   );
 
   const nearby = available.find(t =>
@@ -442,16 +758,98 @@ async function findTreasure() {
     if (updateError) throw updateError;
 
     currentPlayer = data;
+
     await loadRoom();
-    setMessage("¡Encontraste un tesoro! Ganaste un punto.");
+
+    setMessage("🎉 ¡Encontraste un tesoro! Ganaste un punto.");
 
   } catch (error) {
     console.error(error);
-    setMessage("No se pudo guardar el tesoro: " + error.message);
+    setMessage(
+      error.code === "23505"
+        ? "¡Ese cofre acaba de ser recogido por el otro capitán!"
+        : "No se pudo guardar el tesoro: " + error.message
+    );
+
+    await loadRoom().catch(console.error);
+
   } finally {
     busy = false;
   }
 }
+
+// ============================================
+// FINALIZAR CARRERA
+// ============================================
+
+async function finishRace() {
+  if (roomStatus === "finished" || !roomCode) return;
+
+  const { error } = await supabaseClient
+    .from("treasure_rooms")
+    .update({ status: "finished" })
+    .eq("room_code", roomCode)
+    .eq("status", "racing");
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  roomStatus = "finished";
+
+  await loadRoom();
+
+  setMessage("¡La carrera terminó! Aquí está el resultado final.");
+}
+
+function renderFinalResult() {
+  const result = $("finalResult");
+
+  if (roomStatus !== "finished") {
+    result.hidden = true;
+    return;
+  }
+
+  result.hidden = false;
+
+  const red = getPlayer("red");
+  const blue = getPlayer("blue");
+
+  const redScore = Number(red?.score || 0);
+  const blueScore = Number(blue?.score || 0);
+
+  let message;
+
+  if (redScore > blueScore) {
+    message =
+      "🏆 ¡Ganó " + (red?.player_name || "el Pirata Rojo") +
+      "! Puntuación: " + redScore + " a " + blueScore + ".";
+  } else if (blueScore > redScore) {
+    message =
+      "🏆 ¡Ganó " + (blue?.player_name || "el Pirata Azul") +
+      "! Puntuación: " + blueScore + " a " + redScore + ".";
+  } else {
+    message =
+      "🤝 ¡Empate! Los dos capitanes consiguieron " +
+      redScore + " tesoros.";
+  }
+
+  const redFinished = red?.finished_at
+    ? "Sí llegó a la meta"
+    : "No llegó a la meta";
+
+  const blueFinished = blue?.finished_at
+    ? "Sí llegó a la meta"
+    : "No llegó a la meta";
+
+  $("winnerMessage").textContent =
+    message + " " + redFinished + ". " + blueFinished + ".";
+}
+
+// ============================================
+// REINICIAR LA PARTIDA
+// ============================================
 
 async function restartGame() {
   if (!currentPlayer || busy) {
@@ -459,7 +857,9 @@ async function restartGame() {
     return;
   }
 
-  if (!confirm("¿Reiniciar la partida para los dos jugadores?")) return;
+  if (!confirm("¿Volver a preparar la sala para los dos capitanes?")) {
+    return;
+  }
 
   busy = true;
 
@@ -475,8 +875,10 @@ async function restartGame() {
       .from("treasure_players")
       .update({
         score: 0,
-        x: 15,
-        y: 50,
+        x: 8,
+        y: 25,
+        is_ready: false,
+        finished_at: null,
         updated_at: new Date().toISOString()
       })
       .eq("room_code", roomCode)
@@ -488,8 +890,10 @@ async function restartGame() {
       .from("treasure_players")
       .update({
         score: 0,
-        x: 75,
-        y: 50,
+        x: 8,
+        y: 75,
+        is_ready: false,
+        finished_at: null,
         updated_at: new Date().toISOString()
       })
       .eq("room_code", roomCode)
@@ -497,24 +901,36 @@ async function restartGame() {
 
     if (blueError) throw blueError;
 
-    const { error: timerError } = await supabaseClient
+    const { error: roomError } = await supabaseClient
       .from("treasure_rooms")
-      .update({ started_at: new Date().toISOString() })
+      .update({
+        status: "waiting",
+        started_at: new Date().toISOString()
+      })
       .eq("room_code", roomCode);
 
-    if (timerError) throw timerError;
+    if (roomError) throw roomError;
 
-    await loadRoomTimer();
+    currentPlayer.is_ready = false;
+    currentPlayer.finished_at = null;
+    currentPlayer.score = 0;
+
     await loadRoom();
 
-    setMessage("¡Partida reiniciada para todos!");
+    setMessage("¡Sala reiniciada! Los dos deben marcar que están listos.");
 
   } catch (error) {
+    console.error(error);
     setMessage("Error al reiniciar: " + error.message);
   } finally {
     busy = false;
+    renderWaitingRoom();
   }
 }
+
+// ============================================
+// ABANDONAR PARTIDA
+// ============================================
 
 async function leaveGame() {
   if (!currentPlayer || busy) {
@@ -522,7 +938,9 @@ async function leaveGame() {
     return;
   }
 
-  if (!confirm("¿Seguro que quieres abandonar la isla?")) return;
+  if (!confirm("¿Seguro que quieres abandonar la isla?")) {
+    return;
+  }
 
   busy = true;
 
@@ -537,26 +955,54 @@ async function leaveGame() {
     if (error) throw error;
 
     localStorage.removeItem(storageKey(roomCode));
+
     currentPlayer = null;
+
+    // Si alguien abandona, la sala vuelve a esperar
+    const { error: resetError } = await supabaseClient
+      .from("treasure_rooms")
+      .update({
+        status: "waiting",
+        started_at: new Date().toISOString()
+      })
+      .eq("room_code", roomCode);
+
+    if (resetError) throw resetError;
+
+    const { error: readyError } = await supabaseClient
+      .from("treasure_players")
+      .update({ is_ready: false })
+      .eq("room_code", roomCode);
+
+    if (readyError) throw readyError;
 
     await loadRoom();
 
-    setMessage("Has abandonado la partida.");
     $("playerInfo").textContent = "Has salido de la isla.";
+
+    setMessage("Has abandonado la partida.");
 
     if (channel) {
       await supabaseClient.removeChannel(channel);
       channel = null;
     }
 
+    setStatus("Has salido de la isla");
+
   } catch (error) {
+    console.error(error);
     setMessage("No se pudo abandonar: " + error.message);
   } finally {
     busy = false;
   }
 }
 
+// ============================================
+// BOTONES Y TECLADO
+// ============================================
+
 $("joinButton").addEventListener("click", joinIsland);
+$("readyButton").addEventListener("click", markReady);
 $("findTreasureButton").addEventListener("click", findTreasure);
 $("restartButton").addEventListener("click", restartGame);
 $("leaveButton").addEventListener("click", leaveGame);
@@ -567,7 +1013,6 @@ document.querySelectorAll("[data-move]").forEach(button => {
   });
 });
 
-// Controles del teclado
 document.addEventListener("keydown", event => {
   const keys = {
     ArrowUp: "up",
@@ -584,7 +1029,11 @@ document.addEventListener("keydown", event => {
     D: "right"
   };
 
-  if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+  if (
+    ["INPUT", "TEXTAREA"].includes(
+      document.activeElement.tagName
+    )
+  ) {
     return;
   }
 
@@ -596,4 +1045,12 @@ document.addEventListener("keydown", event => {
   }
 });
 
+// ============================================
+// INICIO
+// ============================================
+
+$("readyButton").disabled = true;
+$("finalResult").hidden = true;
+
 setStatus("Listo para comenzar");
+startTimer();
