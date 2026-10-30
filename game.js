@@ -1,4 +1,6 @@
+
 // Treasure Island - Laboratorio 4
+
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 
@@ -40,14 +42,11 @@ function storageKey(room) {
 
 async function loadRoom() {
   const [playersResult, claimsResult] = await Promise.all([
-    supabase.from("treasure_players")
-      .select("*")
-      .eq("room_code", roomCode),
-    supabase.from("treasure_claims")
-      .select("*")
-      .eq("room_code", roomCode)
-      .order("created_at", { ascending: false })
-      .limit(12)
+    supabaseClient.from("treasure_players")
+      .select("*").eq("room_code", roomCode),
+    supabaseClient.from("treasure_claims")
+      .select("*").eq("room_code", roomCode)
+      .order("created_at", { ascending: false }).limit(12)
   ]);
 
   if (playersResult.error) throw playersResult.error;
@@ -62,11 +61,10 @@ function render() {
   const red = roomPlayers.find(p => p.role === "red");
   const blue = roomPlayers.find(p => p.role === "blue");
 
-  $("nameA").textContent = red ? red.player_name : "Pirata Rojo";
-  $("nameB").textContent = blue ? blue.player_name : "Pirata Azul";
-
-  $("scoreA").textContent = red ? red.score : 0;
-  $("scoreB").textContent = blue ? blue.score : 0;
+  $("nameA").textContent = red?.player_name || "Pirata Rojo";
+  $("nameB").textContent = blue?.player_name || "Pirata Azul";
+  $("scoreA").textContent = red?.score ?? 0;
+  $("scoreB").textContent = blue?.score ?? 0;
 
   if (red) {
     $("pirateA").style.left = red.x + "%";
@@ -82,9 +80,8 @@ function render() {
 
   $("treasureArea").innerHTML = TREASURES
     .filter(t => !claimed.has(t.id))
-    .map(t =>
-      `<span class="treasure" style="left:${t.x}%;top:${t.y}%">🧰</span>`
-    ).join("");
+    .map(t => `<span class="treasure" style="left:${t.x}%;top:${t.y}%">🧰</span>`)
+    .join("");
 
   const activity = $("activityList");
   activity.innerHTML = "";
@@ -116,31 +113,26 @@ async function joinIsland() {
 
   busy = true;
   $("joinButton").disabled = true;
+  currentPlayer = null;
 
   try {
-    currentPlayer = null;
-
     const savedId = localStorage.getItem(storageKey(roomCode));
 
     if (savedId) {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from("treasure_players")
-        .select("*")
-        .eq("id", savedId)
-        .maybeSingle();
+        .select("*").eq("id", savedId).maybeSingle();
 
       if (error) throw error;
 
       if (data) {
-        const { data: updated, error: updateError } = await supabase
-          .from("treasure_players")
-          .update({
-            player_name: playerName,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", savedId)
-          .select()
-          .single();
+        const { data: updated, error: updateError } =
+          await supabaseClient.from("treasure_players")
+            .update({
+              player_name: playerName,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", savedId).select().single();
 
         if (updateError) throw updateError;
         currentPlayer = updated;
@@ -148,10 +140,9 @@ async function joinIsland() {
     }
 
     if (!currentPlayer) {
-      const { data: existing, error } = await supabase
+      const { data: existing, error } = await supabaseClient
         .from("treasure_players")
-        .select("role")
-        .eq("room_code", roomCode);
+        .select("role").eq("room_code", roomCode);
 
       if (error) throw error;
 
@@ -164,7 +155,7 @@ async function joinIsland() {
         return;
       }
 
-      const { data, error: insertError } = await supabase
+      const { data, error: insertError } = await supabaseClient
         .from("treasure_players")
         .insert({
           id: crypto.randomUUID(),
@@ -174,9 +165,7 @@ async function joinIsland() {
           x: role === "red" ? 15 : 75,
           y: 50,
           score: 0
-        })
-        .select()
-        .single();
+        }).select().single();
 
       if (insertError) throw insertError;
 
@@ -186,17 +175,18 @@ async function joinIsland() {
 
     $("playerInfo").textContent =
       "Estás jugando como Pirata " +
-      (currentPlayer.role === "red" ? "Rojo" : "Azul");
+      (currentPlayer.role === "red" ? "Rojo" : "Azul") +
+      " en " + roomCode;
 
-    setMessage("¡Aventura iniciada!");
     await loadRoom();
     subscribeToRoom();
+    setMessage("¡Aventura iniciada! Busca los tesoros.");
     setStatus("Conectado a la isla", true);
 
   } catch (error) {
     console.error(error);
     setStatus("Error de conexión");
-    setMessage("Error: " + error.message);
+    setMessage("No se pudo entrar: " + error.message);
   } finally {
     busy = false;
     $("joinButton").disabled = false;
@@ -204,9 +194,9 @@ async function joinIsland() {
 }
 
 function subscribeToRoom() {
-  if (channel) supabase.removeChannel(channel);
+  if (channel) supabaseClient.removeChannel(channel);
 
-  channel = supabase.channel("treasure-room-" + roomCode)
+  channel = supabaseClient.channel("treasure-room-" + roomCode)
     .on("postgres_changes", {
       event: "*",
       schema: "public",
@@ -246,20 +236,18 @@ async function movePlayer(direction) {
   busy = true;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("treasure_players")
       .update({ x, y, updated_at: new Date().toISOString() })
-      .eq("id", currentPlayer.id)
-      .select()
-      .single();
+      .eq("id", currentPlayer.id).select().single();
 
     if (error) throw error;
 
     currentPlayer = data;
     await loadRoom();
-    setMessage("¡Te has movido por la isla!");
+    setMessage("¡Movimiento guardado!");
   } catch (error) {
-    setMessage("Error al guardar movimiento: " + error.message);
+    setMessage("Error al mover: " + error.message);
   } finally {
     busy = false;
   }
@@ -290,7 +278,7 @@ async function findTreasure() {
   busy = true;
 
   try {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("treasure_claims")
       .insert({
         room_code: roomCode,
@@ -301,24 +289,22 @@ async function findTreasure() {
 
     if (error) throw error;
 
-    const { data, error: updateError } = await supabase
+    const { data, error: updateError } = await supabaseClient
       .from("treasure_players")
       .update({
         score: Number(currentPlayer.score) + 1,
         updated_at: new Date().toISOString()
       })
-      .eq("id", currentPlayer.id)
-      .select()
-      .single();
+      .eq("id", currentPlayer.id).select().single();
 
     if (updateError) throw updateError;
 
     currentPlayer = data;
-    setMessage("¡Encontraste un tesoro! Ganaste un punto.");
     await loadRoom();
+    setMessage("¡Encontraste un tesoro! Ganaste un punto.");
 
   } catch (error) {
-    setMessage("Error al guardar el tesoro: " + error.message);
+    setMessage("Error al guardar tesoro: " + error.message);
   } finally {
     busy = false;
   }
