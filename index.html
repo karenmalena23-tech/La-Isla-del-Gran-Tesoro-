@@ -5,62 +5,102 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>La Isla del Gran Tesoro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <header>
-    <h1>🏝️ La Isla del Gran Tesoro</h1>
-    <p>¡Exploren juntos y encuentren el tesoro perdido!</p>
+  <div class="decor decor-one">🌴</div>
+  <div class="decor decor-two">☁️</div>
+
+  <header class="top">
+    <div class="logo">🏝️ LA ISLA DEL <span>GRAN TESORO</span></div>
+    <p>Una aventura es mejor cuando se comparte</p>
   </header>
 
   <main>
     <section id="lobby" class="panel">
-      <h2>¡Preparen su aventura!</h2>
+      <div class="section-title">
+        <span>✨</span>
+        <div>
+          <h1>¡Elige tu explorador!</h1>
+          <p>Prepara tu mochila. El tesoro te espera.</p>
+        </div>
+      </div>
 
       <label for="nickname">Tu nombre</label>
-      <input id="nickname" maxlength="14" placeholder="Escribe tu nombre">
+      <input id="nickname" maxlength="14" placeholder="¿Cómo te llamas?">
 
-      <label for="character">Elige tu explorador</label>
-      <select id="character">
-        <option value="🧭">Nico 🧭</option>
-        <option value="🌙">Luna 🌙</option>
-        <option value="🏴‍☠️">Capitán Coco 🏴‍☠️</option>
-        <option value="⚡">Chispa ⚡</option>
-      </select>
+      <div class="character-grid">
+        <button class="character-card selected" data-character="nico" type="button">
+          <div class="avatar nico">🧭</div>
+          <strong>NICO</strong>
+          <small>El explorador</small>
+          <span>🗺️</span>
+        </button>
 
-      <label for="roomCode">Código de sala</label>
-      <input id="roomCode" maxlength="8" placeholder="Ej. ISLA25">
+        <button class="character-card" data-character="luna" type="button">
+          <div class="avatar luna">🌙</div>
+          <strong>LUNA</strong>
+          <small>La aventurera</small>
+          <span>🏮</span>
+        </button>
+
+        <button class="character-card" data-character="coco" type="button">
+          <div class="avatar coco">🏴‍☠️</div>
+          <strong>CAPITÁN COCO</strong>
+          <small>El pirata</small>
+          <span>⚓</span>
+        </button>
+
+        <button class="character-card" data-character="chispa" type="button">
+          <div class="avatar chispa">⚡</div>
+          <strong>CHISPA</strong>
+          <small>La inventora</small>
+          <span>🔧</span>
+        </button>
+      </div>
+
+      <label for="roomCode">Código de aventura</label>
+      <input id="roomCode" maxlength="8" placeholder="Escribe el código para unirte">
 
       <div class="actions">
-        <button id="createBtn">Crear aventura</button>
-        <button id="joinBtn" class="secondary">Unirse a una sala</button>
+        <button id="createBtn" class="main-btn">🌟 Crear aventura</button>
+        <button id="joinBtn" class="join-btn">🚀 Unirme</button>
       </div>
-      <p id="status">Crea una sala o únete con un código.</p>
+      <p id="status">Elige un personaje y crea una sala o únete a otra.</p>
     </section>
 
     <section id="game" class="hidden">
-      <div class="hud">
-        <span id="roomLabel">Sala: ---</span>
-        <span id="playersLabel">Jugadores: 1/2</span>
-        <span id="keyLabel">🗝️ Llave: no encontrada</span>
-        <span id="gemLabel">💎 Gemas: 0</span>
+      <div class="game-heading">
+        <div>
+          <h2>🌴 ¡A explorar!</h2>
+          <p id="roomLabel">Sala: ---</p>
+        </div>
+        <div class="stats">
+          <span id="playersLabel">👥 1/2</span>
+          <span id="keyLabel">🗝️ Sin llave</span>
+          <span id="gemLabel">💎 0</span>
+        </div>
       </div>
 
-      <div class="game-wrap">
+      <div class="canvas-frame">
         <canvas id="gameCanvas" width="960" height="480"></canvas>
       </div>
 
-      <div class="instructions">
-        <p><b>Controles:</b> A / D o ← / → para caminar · W, ↑ o espacio para saltar · E para interactuar.</p>
-        <p>Busca la llave, descubre la entrada de la cueva y abre el cofre. ¡Trabajen en equipo!</p>
+      <div class="controls">
+        <div>⌨️ <b>Muévete:</b> A / D o flechas</div>
+        <div>⬆️ <b>Saltar:</b> W, ↑ o espacio</div>
+        <div>🔍 <b>Interactuar:</b> E</div>
       </div>
 
-      <div id="message" class="message">¡Exploren la isla!</div>
-      <button id="leaveBtn" class="secondary">Salir de la aventura</button>
+      <div id="message" class="message">¡La aventura comienza!</div>
+      <button id="leaveBtn" class="leave-btn">Salir de la aventura</button>
     </section>
   </main>
 
+  <footer>✨ La aventura comienza donde termina el mapa ✨</footer>
   <script src="script.js"></script>
 </body>
 </html>
