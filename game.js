@@ -2,10 +2,9 @@
 // ==================================================
 // LA ISLA DEL GRAN TESORO
 // MULTIJUGADOR - SUPABASE
-// CORRER, SALTAR, PLATAFORMAS Y GANADOR
+// CARRERA, SALTOS, CUENTA REGRESIVA Y CRONÓMETRO
 // ==================================================
 
-// SUPABASE
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 
@@ -26,8 +25,12 @@ const GROUND_TOP = 338;
 const PLAYER_SPEED = 5;
 const GRAVITY = 0.65;
 const JUMP_FORCE = -13;
-const PLAYER_HEIGHT = 48;
+
+// El personaje usa coordenadas desde su centro.
+const PLAYER_HALF_HEIGHT = 24;
+
 const SAVE_INTERVAL = 150;
+const GAME_DURATION = 300;
 
 const PLATFORMS = [
   { x: 430, top: 270, width: 190 },
@@ -75,6 +78,7 @@ let lastMovementTime = 0;
 let lastSaveTime = 0;
 
 let gameLoop = null;
+let gameTimeLeft = GAME_DURATION;
 
 // UTILIDADES
 function setMessage(message) {
@@ -245,12 +249,55 @@ function renderWaitingRoom() {
       $("readyMessage").textContent =
         "Los dos capitanes deben estar listos.";
     } else if (roomStatus === "countdown") {
-      $("readyMessage").textContent = "¡Prepárense para correr!";
+      $("readyMessage").textContent =
+        "¡Prepárense! La carrera está por comenzar.";
     } else if (roomStatus === "racing") {
-      $("readyMessage").textContent = "¡La carrera está en marcha!";
+      $("readyMessage").textContent =
+        "¡La carrera está en marcha!";
     } else {
       $("readyMessage").textContent = "La carrera terminó.";
     }
+  }
+}
+
+// CRONÓMETRO
+function updateTimerDisplay(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  if ($("timerDisplay")) {
+    $("timerDisplay").textContent =
+      `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+}
+
+function updateCountdownDisplay() {
+  if (!startedAt || !$("countdownDisplay")) return;
+
+  const remaining = Math.max(
+    0,
+    Math.ceil(
+      (new Date(startedAt).getTime() - Date.now()) / 1000
+    )
+  );
+
+  $("countdownDisplay").textContent =
+    remaining > 0 ? remaining : "¡YA!";
+}
+
+function updateGameTimer() {
+  if (!startedAt || roomStatus !== "racing") return;
+
+  const elapsed = Math.floor(
+    (Date.now() - new Date(startedAt).getTime()) / 1000
+  );
+
+  gameTimeLeft = Math.max(0, GAME_DURATION - elapsed);
+
+  updateTimerDisplay(gameTimeLeft);
+
+  if (gameTimeLeft <= 0) {
+    finishByTime();
   }
 }
 
@@ -316,6 +363,16 @@ async function loadRoom() {
           x: previousPlayer.x,
           y: previousPlayer.y
         };
+
+        const index = roomPlayers.findIndex(
+          player => player.id === previousPlayer.id
+        );
+
+        roomPlayers[index] = {
+          ...updated,
+          x: previousPlayer.x,
+          y: previousPlayer.y
+        };
       }
     }
 
@@ -328,6 +385,10 @@ async function loadRoom() {
 
     if (roomStatus === "countdown") {
       advanceRoomState();
+    }
+
+    if (roomStatus === "racing") {
+      updateGameTimer();
     }
 
   } finally {
@@ -509,7 +570,7 @@ async function markReady() {
 
       if (roomError) throw roomError;
 
-      setMessage("¡Ambos están listos! ¡La carrera comienza pronto!");
+      setMessage("¡Ambos están listos! ¡Prepárense!");
     } else {
       setMessage("¡Estás listo! Esperando al otro capitán.");
     }
@@ -540,8 +601,7 @@ async function advanceRoomState() {
     const { data, error } = await supabaseClient
       .from("treasure_rooms")
       .update({
-        status: "racing",
-        started_at: new Date().toISOString()
+        status: "racing"
       })
       .eq("room_code", roomCode)
       .eq("status", "countdown")
@@ -553,11 +613,20 @@ async function advanceRoomState() {
     if (data) {
       roomData = data;
       roomStatus = "racing";
+
+      // Se conserva la hora de inicio de la carrera.
       startedAt = data.started_at;
 
       verticalVelocity = 0;
       isGrounded = true;
       pressedKeys.clear();
+
+      gameTimeLeft = GAME_DURATION;
+      updateTimerDisplay(GAME_DURATION);
+
+      if ($("countdownDisplay")) {
+        $("countdownDisplay").textContent = "";
+      }
 
       setMessage("¡LA CARRERA COMENZÓ! ¡CORRAN!");
       render();
@@ -637,8 +706,8 @@ function physicsStep() {
   let landed = false;
 
   if (verticalVelocity >= 0) {
-    const oldFeet = oldY + PLAYER_HEIGHT;
-    const newFeet = newY + PLAYER_HEIGHT;
+    const oldFeet = oldY + PLAYER_HALF_HEIGHT;
+    const newFeet = newY + PLAYER_HALF_HEIGHT;
 
     for (const platform of PLATFORMS) {
       const x = Number(currentPlayer.x);
@@ -652,7 +721,7 @@ function physicsStep() {
         oldFeet <= platform.top &&
         newFeet >= platform.top
       ) {
-        newY = platform.top - PLAYER_HEIGHT;
+        newY = platform.top - PLAYER_HALF_HEIGHT;
         verticalVelocity = 0;
         landed = true;
         break;
@@ -660,15 +729,22 @@ function physicsStep() {
     }
   }
 
-  if (newY + PLAYER_HEIGHT >= GROUND_TOP) {
-    newY = GROUND_TOP - PLAYER_HEIGHT;
+  if (newY + PLAYER_HALF_HEIGHT >= GROUND_TOP) {
+    newY = GROUND_TOP - PLAYER_HALF_HEIGHT;
     verticalVelocity = 0;
     landed = true;
   }
 
   isGrounded = landed;
-
   currentPlayer.y = newY;
+
+  const index = roomPlayers.findIndex(
+    player => player.id === currentPlayer.id
+  );
+
+  if (index !== -1) {
+    roomPlayers[index].y = newY;
+  }
 
   drawPirate(
     currentPlayer.role === "red" ? "pirateA" : "pirateB",
@@ -706,9 +782,18 @@ function movePlayer(direction) {
 
   if (direction === "down") {
     currentPlayer.y = Math.min(
-      GROUND_TOP - PLAYER_HEIGHT,
+      GROUND_TOP - PLAYER_HALF_HEIGHT,
       Number(currentPlayer.y) + PLAYER_SPEED
     );
+  }
+
+  const index = roomPlayers.findIndex(
+    player => player.id === currentPlayer.id
+  );
+
+  if (index !== -1) {
+    roomPlayers[index].x = currentPlayer.x;
+    roomPlayers[index].y = currentPlayer.y;
   }
 
   drawPirate(
@@ -761,6 +846,7 @@ async function savePosition() {
 // BUCLE PRINCIPAL
 function gameStep() {
   if (roomStatus === "countdown") {
+    updateCountdownDisplay();
     advanceRoomState();
     return;
   }
@@ -791,6 +877,8 @@ function gameStep() {
     lastSaveTime = now;
     savePosition();
   }
+
+  updateGameTimer();
 }
 
 // LLEGADA A LA META
@@ -837,13 +925,47 @@ async function markFinished() {
     }
 
     await loadRoom();
-
     setMessage("¡La carrera terminó!");
 
   } catch (error) {
     console.error(error);
     setMessage("Error registrando la llegada: " + error.message);
     finishing = false;
+  }
+}
+
+// SE ACABÓ EL TIEMPO
+async function finishByTime() {
+  if (roomStatus !== "racing" || finishing) return;
+
+  finishing = true;
+  pressedKeys.clear();
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("treasure_rooms")
+      .update({
+        status: "finished"
+      })
+      .eq("room_code", roomCode)
+      .eq("status", "racing")
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      roomData = data;
+      roomStatus = "finished";
+    }
+
+    await loadRoom();
+    setMessage("¡Se acabó el tiempo!");
+
+  } catch (error) {
+    console.error(error);
+    finishing = false;
+    setMessage("Error al terminar la partida: " + error.message);
   }
 }
 
@@ -870,8 +992,8 @@ function renderFinalResult() {
   let subtitle;
 
   if (!winnerId) {
-    heading = "¡PARTIDA TERMINADA!";
-    subtitle = "La carrera ha finalizado.";
+    heading = "¡TIEMPO TERMINADO!";
+    subtitle = "La carrera terminó sin que nadie llegara a la meta.";
   } else if (currentPlayer && winnerId === currentPlayer.id) {
     heading = "¡GANASTE!";
     subtitle = "¡Felicidades, " + winnerName + "!";
@@ -948,6 +1070,12 @@ async function restartGame() {
 
     verticalVelocity = 0;
     isGrounded = true;
+    gameTimeLeft = GAME_DURATION;
+    updateTimerDisplay(GAME_DURATION);
+
+    if ($("countdownDisplay")) {
+      $("countdownDisplay").textContent = "";
+    }
 
     await loadRoom();
 
@@ -1019,15 +1147,11 @@ function setupControls() {
   $("restartButton")?.addEventListener("click", restartGame);
   $("leaveButton")?.addEventListener("click", leaveGame);
 
-  // Ocultar funciones que ya no utilizaremos.
   if ($("findTreasureButton")) {
     $("findTreasureButton").hidden = true;
   }
 
-  const timerHeading = document.querySelector(".game-options h3");
-  if (timerHeading) timerHeading.hidden = true;
-
-  // Botones de movimiento para móvil y ordenador.
+  // Botones de movimiento para móvil.
   document.querySelectorAll("[data-move]").forEach(button => {
     const direction = button.dataset.move;
 
@@ -1062,7 +1186,7 @@ function setupControls() {
     button.addEventListener("lostpointercapture", release);
   });
 
-  // Teclado.
+  // TECLADO
   document.addEventListener("keydown", event => {
     const tag = document.activeElement?.tagName;
 
@@ -1109,6 +1233,7 @@ function initGame() {
     $("finalResult").hidden = true;
   }
 
+  updateTimerDisplay(GAME_DURATION);
   setStatus("Listo para comenzar");
 
   if (gameLoop) clearInterval(gameLoop);
