@@ -1,1 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>La Isla de los Elementos</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<main>
+<header>✦ ISLA COOPERATIVA <span id="status">Aventura para dos</span></header>
 
+<section id="lobby" class="screen lobby">
+  <div class="intro">
+    <small>UNA AVENTURA DE DOS</small>
+    <h1>Dos elementos.<br><i>Un solo destino.</i></h1>
+    <p>Resuelvan acertijos, esquiven trampas y abran juntos el portal del templo.</p>
+  </div>
+  <div class="panel">
+    <small>PREPARA TU PARTIDA</small>
+    <h2>Únete a la expedición</h2>
+    <label>Tu nombre</label>
+    <input id="nickname" maxlength="14" placeholder="Explorador">
+    <label>Elige personaje</label>
+    <div class="choices">
+      <button class="choice active" data-role="fire">
+        <b class="avatar fire">✦</b>
+        <strong>BRASA</strong>
+        <small>Guardián del fuego</small>
+      </button>
+      <button class="choice" data-role="water">
+        <b class="avatar water">✧</b>
+        <strong>ONDA</strong>
+        <small>Guardiana del agua</small>
+      </button>
+    </div>
+    <button id="create" class="primary">Crear sala →</button>
+    <div class="join">
+      <input id="code" maxlength="6" placeholder="CÓDIGO">
+      <button id="join">Unirme</button>
+    </div>
+    <p id="lobbyMsg">Crea una sala y comparte el código con tu compañero.</p>
+  </div>
+</section>
+
+<section id="waiting" class="screen hidden">
+  <div class="panel wait">
+    <small>SALA DE EXPEDICIÓN</small>
+    <h2>La aventura empieza<br><i>cuando ambos estén listos.</i></h2>
+    <div class="codebox">
+      CÓDIGO DE SALA
+      <b id="roomCode">------</b>
+      <button id="copy">Copiar</button>
+    </div>
+    <div class="players">
+      <div id="p0" class="slot">Jugador 1<small>Esperando...</small></div>
+      <div id="p1" class="slot">Jugador 2<small>Esperando...</small></div>
+    </div>
+    <button id="ready" class="primary">Estoy listo ✓</button>
+    <p id="waitMsg">Los dos jugadores deben pulsar «Estoy listo».</p>
+    <button id="leave" class="plain">Salir de la sala</button>
+  </div>
+</section>
+
+<section id="game" class="screen hidden game">
+  <div class="gamehead">
+    <div>
+      <small>TEMPLO DE LAS MAREAS</small>
+      <h2 id="levelTitle"></h2>
+    </div>
+    <div class="stats">◆ <b id="gems">0</b>/3 &nbsp; 🔑 <b id="keyStatus">Busca la llave</b></div>
+  </div>
+  <div class="board">
+    <canvas id="world" width="960" height="540"></canvas>
+    <div id="win" class="win hidden">
+      <h2>¡Portal abierto!</h2>
+      <p>Los dos llegaron juntos. ¡Excelente equipo!</p>
+      <button id="next" class="primary">Siguiente zona →</button>
+    </div>
+    <div id="toast"></div>
+  </div>
+  <div class="help">
+    <span><kbd>A D W</kbd> Brasa</span>
+    <span><kbd>← → ↑</kbd> Onda</span>
+    <span><kbd>E</kbd> Recoger llave / palanca</span>
+    <button id="quit" class="plain">Salir</button>
+  </div>
+  <div class="mobile">
+    <button data-k="a">◀</button>
+    <button data-k="d">▶</button>
+    <button data-k="w">▲</button>
+    <button data-k="left">◀</button>
+    <button data-k="right">▶</button>
+    <button data-k="up">▲</button>
+  </div>
+</section>
+
+<footer>LA ISLA DE LOS ELEMENTOS <span>Una aventura se gana en equipo ✦</span></footer>
+</main>
+<script src="script.js"></script>
+</body>
+</html>
