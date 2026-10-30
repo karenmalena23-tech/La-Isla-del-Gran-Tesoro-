@@ -1,291 +1,336 @@
-
+// Treasure Island - Laboratorio 4
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
-const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+
+const $ = (id) => document.getElementById(id);
 
 const TREASURES = [
-  { id: 1, x: 20, y: 20 },
-  { id: 2, x: 75, y: 25 },
-  { id: 3, x: 45, y: 65 },
-  { id: 4, x: 80, y: 75 }
+  { id: 1, x: 18, y: 25 },
+  { id: 2, x: 48, y: 18 },
+  { id: 3, x: 76, y: 30 },
+  { id: 4, x: 35, y: 72 },
+  { id: 5, x: 72, y: 76 }
 ];
 
-let player = null;
-let players = [];
-let treasures = [];
+let currentPlayer = null;
+let roomCode = "";
+let roomPlayers = [];
+let roomClaims = [];
 let channel = null;
+let busy = false;
 
-const $ = id => document.getElementById(id);
+function setMessage(message) {
+  $("gameMessage").textContent = message;
+}
 
-function showMessage(text) {
-  $("gameMessage").textContent = text;
-  $("connectionStatus").textContent = text;
+function setStatus(message, connected = false) {
+  $("connectionStatus").textContent = message;
+  $("connectionStatus").style.color =
+    connected ? "#a9e6a9" : "#f4ca70";
+}
+
+function storageKey(room) {
+  return "treasure_island_player_" + room;
+}
+
+async function loadRoom() {
+  const [playersResult, claimsResult] = await Promise.all([
+    supabase.from("treasure_players")
+      .select("*")
+      .eq("room_code", roomCode),
+    supabase.from("treasure_claims")
+      .select("*")
+      .eq("room_code", roomCode)
+      .order("created_at", { ascending: false })
+      .limit(12)
+  ]);
+
+  if (playersResult.error) throw playersResult.error;
+  if (claimsResult.error) throw claimsResult.error;
+
+  roomPlayers = playersResult.data || [];
+  roomClaims = claimsResult.data || [];
+  render();
 }
 
 function render() {
-  if (!player) return;
+  const red = roomPlayers.find(p => p.role === "red");
+  const blue = roomPlayers.find(p => p.role === "blue");
 
-  const red = players.find(p => p.role === "red");
-  const blue = players.find(p => p.role === "blue");
+  $("nameA").textContent = red ? red.player_name : "Pirata Rojo";
+  $("nameB").textContent = blue ? blue.player_name : "Pirata Azul";
 
-  function updatePirate(element, p) {
-    if (!p) {
-      element.style.display = "none";
-      return;
-    }
-    element.style.display = "block";
-    element.style.left = p.x + "%";
-    element.style.top = p.y + "%";
+  $("scoreA").textContent = red ? red.score : 0;
+  $("scoreB").textContent = blue ? blue.score : 0;
+
+  if (red) {
+    $("pirateA").style.left = red.x + "%";
+    $("pirateA").style.top = red.y + "%";
   }
 
-  updatePirate($("pirateA"), red);
-  updatePirate($("pirateB"), blue);
+  if (blue) {
+    $("pirateB").style.left = blue.x + "%";
+    $("pirateB").style.top = blue.y + "%";
+  }
 
-  $("nameA").textContent = red?.player_name || "Pirata Rojo";
-  $("nameB").textContent = blue?.player_name || "Pirata Azul";
-  $("scoreA").textContent = red?.score ?? 0;
-  $("scoreB").textContent = blue?.score ?? 0;
+  const claimed = new Set(roomClaims.map(c => c.treasure_id));
 
-  const area = $("treasureArea");
-  area.innerHTML = "";
+  $("treasureArea").innerHTML = TREASURES
+    .filter(t => !claimed.has(t.id))
+    .map(t =>
+      `<span class="treasure" style="left:${t.x}%;top:${t.y}%">🧰</span>`
+    ).join("");
 
-  TREASURES.forEach(t => {
-    if (treasures.some(found => found.treasure_id === t.id)) return;
+  const activity = $("activityList");
+  activity.innerHTML = "";
 
-    const item = document.createElement("span");
-    item.textContent = "💎";
-    item.style.position = "absolute";
-    item.style.left = t.x + "%";
-    item.style.top = t.y + "%";
-    item.style.fontSize = "25px";
-    area.appendChild(item);
-  });
-
-  const list = $("activityList");
-  list.innerHTML = "";
-
-  if (treasures.length === 0) {
-    list.innerHTML = "<li>Los tesoros aparecerán aquí.</li>";
+  if (!roomClaims.length) {
+    const li = document.createElement("li");
+    li.textContent = "Los tesoros aparecerán aquí.";
+    activity.appendChild(li);
   } else {
-    treasures.slice(-5).reverse().forEach(t => {
+    roomClaims.forEach(claim => {
       const li = document.createElement("li");
-      li.textContent = `${t.player_name} encontró un tesoro`;
-      list.appendChild(li);
+      li.textContent = claim.player_name + " encontró un tesoro.";
+      activity.appendChild(li);
     });
   }
 }
 
-async function loadData() {
-  const { data: p, error: pe } = await db
-    .from("game_players")
-    .select("*")
-    .eq("room_code", $("roomCode").value.trim());
+async function joinIsland() {
+  if (busy) return;
 
-  if (pe) throw pe;
-  players = p || [];
+  const playerName = $("playerName").value.trim().slice(0, 20);
+  roomCode = $("roomCode").value.trim().toLowerCase()
+    .replace(/[^a-z0-9-]/g, "").slice(0, 30);
 
-  const { data: t, error: te } = await db
-    .from("game_treasures")
-    .select("*")
-    .eq("room_code", $("roomCode").value.trim());
+  if (!playerName || !roomCode) {
+    setMessage("Escribe tu nombre y el código de la isla.");
+    return;
+  }
 
-  if (te) throw te;
-  treasures = t || [];
-  render();
-}
+  busy = true;
+  $("joinButton").disabled = true;
 
-async function joinGame() {
   try {
-    const name = $("playerName").value.trim();
-    const room = $("roomCode").value.trim();
+    currentPlayer = null;
 
-    if (!name || !room) {
-      showMessage("Escribe tu nombre y el código de la isla.");
-      return;
-    }
-
-    showMessage("Conectando con la isla...");
-
-    const savedId = localStorage.getItem("treasure_player_id");
+    const savedId = localStorage.getItem(storageKey(roomCode));
 
     if (savedId) {
-      const { data, error } = await db
-        .from("game_players")
+      const { data, error } = await supabase
+        .from("treasure_players")
         .select("*")
         .eq("id", savedId)
-        .eq("room_code", room)
         .maybeSingle();
 
       if (error) throw error;
-      player = data;
+
+      if (data) {
+        const { data: updated, error: updateError } = await supabase
+          .from("treasure_players")
+          .update({
+            player_name: playerName,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", savedId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        currentPlayer = updated;
+      }
     }
 
-    if (!player) {
-      const { data: occupied, error } = await db
-        .from("game_players")
+    if (!currentPlayer) {
+      const { data: existing, error } = await supabase
+        .from("treasure_players")
         .select("role")
-        .eq("room_code", room);
+        .eq("room_code", roomCode);
 
       if (error) throw error;
 
-      const used = (occupied || []).map(p => p.role);
-      const role = !used.includes("red") ? "red" : "blue";
+      const taken = new Set((existing || []).map(p => p.role));
+      const role = !taken.has("red") ? "red" :
+        (!taken.has("blue") ? "blue" : null);
 
-      if (used.includes("red") && used.includes("blue")) {
-        throw new Error("Los dos puestos están ocupados. Usa el navegador donde empezaste la partida.");
+      if (!role) {
+        setMessage("La isla ya tiene dos jugadores. Usa otro código.");
+        return;
       }
 
-      const newPlayer = {
-        id: crypto.randomUUID(),
-        room_code: room,
-        player_name: name,
-        role,
-        x: role === "red" ? 15 : 80,
-        y: 50,
-        score: 0
-      };
-
-      const { data, error: insertError } = await db
-        .from("game_players")
-        .insert(newPlayer)
+      const { data, error: insertError } = await supabase
+        .from("treasure_players")
+        .insert({
+          id: crypto.randomUUID(),
+          room_code: roomCode,
+          player_name: playerName,
+          role,
+          x: role === "red" ? 15 : 75,
+          y: 50,
+          score: 0
+        })
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      player = data;
-      localStorage.setItem("treasure_player_id", player.id);
-    } else {
-      const { data, error } = await db
-        .from("game_players")
-        .update({ player_name: name })
-        .eq("id", player.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      player = data;
+      currentPlayer = data;
+      localStorage.setItem(storageKey(roomCode), data.id);
     }
 
-    await loadData();
-    await subscribe();
-    showMessage(`¡Bienvenido ${player.player_name}! Eres el pirata ${player.role}.`);
+    $("playerInfo").textContent =
+      "Estás jugando como Pirata " +
+      (currentPlayer.role === "red" ? "Rojo" : "Azul");
+
+    setMessage("¡Aventura iniciada!");
+    await loadRoom();
+    subscribeToRoom();
+    setStatus("Conectado a la isla", true);
+
   } catch (error) {
     console.error(error);
-    showMessage("Error: " + error.message);
+    setStatus("Error de conexión");
+    setMessage("Error: " + error.message);
+  } finally {
+    busy = false;
+    $("joinButton").disabled = false;
   }
 }
 
-async function subscribe() {
-  if (channel) await db.removeChannel(channel);
+function subscribeToRoom() {
+  if (channel) supabase.removeChannel(channel);
 
-  channel = db.channel("isla-" + $("roomCode").value.trim())
+  channel = supabase.channel("treasure-room-" + roomCode)
     .on("postgres_changes", {
       event: "*",
       schema: "public",
-      table: "game_players"
-    }, () => loadData().catch(console.error))
+      table: "treasure_players",
+      filter: "room_code=eq." + roomCode
+    }, () => loadRoom().catch(console.error))
     .on("postgres_changes", {
-      event: "*",
+      event: "INSERT",
       schema: "public",
-      table: "game_treasures"
-    }, () => loadData().catch(console.error))
+      table: "treasure_claims",
+      filter: "room_code=eq." + roomCode
+    }, () => loadRoom().catch(console.error))
     .subscribe(status => {
       if (status === "SUBSCRIBED") {
-        $("connectionStatus").textContent = "Conectado a la isla";
+        setStatus("En línea · " + roomCode, true);
       }
     });
 }
 
-async function move(direction) {
-  if (!player) {
-    showMessage("Primero entra a la isla.");
+async function movePlayer(direction) {
+  if (!currentPlayer || busy) {
+    if (!currentPlayer) setMessage("Primero entra a la isla.");
     return;
   }
 
-  const changes = {
-    up: [0, -5],
-    down: [0, 5],
-    left: [-5, 0],
-    right: [5, 0]
+  const steps = {
+    up: [0, -8],
+    down: [0, 8],
+    left: [-8, 0],
+    right: [8, 0]
   };
 
-  const [dx, dy] = changes[direction];
+  const delta = steps[direction];
+  const x = Math.max(5, Math.min(90, Number(currentPlayer.x) + delta[0]));
+  const y = Math.max(8, Math.min(82, Number(currentPlayer.y) + delta[1]));
 
-  const { data, error } = await db
-    .from("game_players")
-    .update({
-      x: Math.max(0, Math.min(95, Number(player.x) + dx)),
-      y: Math.max(0, Math.min(90, Number(player.y) + dy))
-    })
-    .eq("id", player.id)
-    .select()
-    .single();
+  busy = true;
 
-  if (error) {
-    showMessage(error.message);
-    return;
+  try {
+    const { data, error } = await supabase
+      .from("treasure_players")
+      .update({ x, y, updated_at: new Date().toISOString() })
+      .eq("id", currentPlayer.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    currentPlayer = data;
+    await loadRoom();
+    setMessage("¡Te has movido por la isla!");
+  } catch (error) {
+    setMessage("Error al guardar movimiento: " + error.message);
+  } finally {
+    busy = false;
   }
-
-  player = data;
-  await loadData();
 }
 
 async function findTreasure() {
-  if (!player) {
-    showMessage("Primero entra a la isla.");
+  if (!currentPlayer || busy) {
+    if (!currentPlayer) setMessage("Primero entra a la isla.");
     return;
   }
 
-  const found = TREASURES.find(t =>
-    !treasures.some(item => item.treasure_id === t.id) &&
-    Math.abs(t.x - Number(player.x)) < 16 &&
-    Math.abs(t.y - Number(player.y)) < 16
+  const available = TREASURES.filter(
+    t => !roomClaims.some(c => c.treasure_id === t.id)
   );
 
-  if (!found) {
-    showMessage("No hay tesoros cerca. ¡Sigue explorando!");
+  const nearby = available.find(t =>
+    Math.hypot(
+      Number(currentPlayer.x) - t.x,
+      Number(currentPlayer.y) - t.y
+    ) < 17
+  );
+
+  if (!nearby) {
+    setMessage("No hay un cofre cerca. Sigue explorando.");
     return;
   }
 
-  const { error } = await db.from("game_treasures").insert({
-    room_code: player.room_code,
-    treasure_id: found.id,
-    player_role: player.role,
-    player_name: player.player_name
-  });
+  busy = true;
 
-  if (error) {
-    showMessage("Otro jugador encontró ese tesoro primero.");
-    await loadData();
-    return;
+  try {
+    const { error } = await supabase
+      .from("treasure_claims")
+      .insert({
+        room_code: roomCode,
+        treasure_id: nearby.id,
+        player_role: currentPlayer.role,
+        player_name: currentPlayer.player_name
+      });
+
+    if (error) throw error;
+
+    const { data, error: updateError } = await supabase
+      .from("treasure_players")
+      .update({
+        score: Number(currentPlayer.score) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", currentPlayer.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    currentPlayer = data;
+    setMessage("¡Encontraste un tesoro! Ganaste un punto.");
+    await loadRoom();
+
+  } catch (error) {
+    setMessage("Error al guardar el tesoro: " + error.message);
+  } finally {
+    busy = false;
   }
-
-  const { data, error: scoreError } = await db
-    .from("game_players")
-    .update({ score: Number(player.score) + 1 })
-    .eq("id", player.id)
-    .select()
-    .single();
-
-  if (scoreError) {
-    showMessage(scoreError.message);
-    return;
-  }
-
-  player = data;
-  await loadData();
-  showMessage("¡Tesoro encontrado! Ganaste un punto.");
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  $("joinButton").addEventListener("click", joinGame);
-  $("findTreasureButton").addEventListener("click", findTreasure);
+$("joinButton").addEventListener("click", joinIsland);
+$("findTreasureButton").addEventListener("click", findTreasure);
 
-  document.querySelectorAll("[data-move]").forEach(button => {
-    button.addEventListener("click", () => move(button.dataset.move));
+document.querySelectorAll("[data-move]").forEach(button => {
+  button.addEventListener("click", () => {
+    movePlayer(button.dataset.move);
   });
-
-  $("connectionStatus").textContent = "Listo para comenzar";
 });
+
+setStatus("Listo para comenzar");
