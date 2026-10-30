@@ -7,12 +7,20 @@ const $ = id => document.getElementById(id);
 const canvas = $("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-const characterInfo = {
-  nico: { emoji: "🧭", color: "#2788c5", name: "Nico" },
-  luna: { emoji: "🌙", color: "#9060c9", name: "Luna" },
-  coco: { emoji: "🏴‍☠️", color: "#d45b43", name: "Capitán Coco" },
-  chispa: { emoji: "⚡", color: "#edaa26", name: "Chispa" }
+const characters = {
+  nico: { emoji: "🧭", color: "#328ac1" },
+  luna: { emoji: "🌙", color: "#9463ce" },
+  coco: { emoji: "🏴‍☠️", color: "#d45b43" },
+  chispa: { emoji: "⚡", color: "#e9a52d" }
 };
+
+const levels = [
+  { name: "Playa de los Náufragos", icon: "🏖️", mission: "Encuentra el mapa perdido y reúne 5 monedas.", item: "🗺️" },
+  { name: "Selva Misteriosa", icon: "🌴", mission: "Encuentra la llave antigua y supera los puentes.", item: "🗝️" },
+  { name: "Cueva de los Cristales", icon: "💎", mission: "Reúne 5 cristales mágicos.", item: "💎" },
+  { name: "Volcán de Fuego", icon: "🌋", mission: "Supera las trampas y encuentra el emblema.", item: "🔥" },
+  { name: "Templo del Gran Tesoro", icon: "🏛️", mission: "Encuentra el tesoro legendario.", item: "👑" }
+];
 
 let selectedCharacter = "nico";
 let user = null;
@@ -21,58 +29,56 @@ let roomCode = "";
 let channel = null;
 let otherPlayer = null;
 let running = false;
-let hasKey = false;
-let openedChest = false;
+let level = 0;
+let unlocked = 0;
+let coins = 0;
 let gems = 0;
+let hearts = 3;
+let collected = new Set();
+let hasMissionItem = false;
+let levelComplete = false;
+let camera = 0;
 let lastSync = 0;
 let lastAction = 0;
+let lastDamage = 0;
 let keys = {};
+let objects = [];
+let enemies = [];
+let platforms = [];
+let particles = [];
+let gameWidth = 2800;
 
 const player = {
-  x: 80, y: 340, vx: 0, vy: 0,
-  width: 34, height: 48,
-  onGround: false
+  x: 70, y: 300, vx: 0, vy: 0,
+  w: 34, h: 48,
+  onGround: false,
+  facing: 1
 };
 
-const platforms = [
-  { x: 0, y: 405, w: 960, h: 75 },
-  { x: 200, y: 330, w: 130, h: 18 },
-  { x: 390, y: 275, w: 140, h: 18 },
-  { x: 610, y: 325, w: 130, h: 18 },
-  { x: 790, y: 265, w: 110, h: 18 }
-];
-
-const traps = [
-  { x: 350, y: 390, w: 38 },
-  { x: 555, y: 390, w: 38 }
-];
-
-const gemItems = [
-  { x: 245, y: 295, taken: false },
-  { x: 430, y: 240, taken: false },
-  { x: 650, y: 290, taken: false },
-  { x: 830, y: 230, taken: false }
-];
-
-const keyItem = { x: 470, y: 235, found: false };
-const chest = { x: 865, y: 365 };
-
-function say(text) {
-  $("message").textContent = text;
-}
-
-document.querySelectorAll(".character-card").forEach(card => {
-  card.addEventListener("click", () => {
-    document.querySelectorAll(".character-card")
-      .forEach(c => c.classList.remove("selected"));
-
-    card.classList.add("selected");
-    selectedCharacter = card.dataset.character;
+document.querySelectorAll(".character").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".character")
+      .forEach(b => b.classList.remove("selected"));
+    button.classList.add("selected");
+    selectedCharacter = button.dataset.character;
   });
 });
 
-function setStatus(text) {
+function status(text) {
   $("status").textContent = text;
+}
+
+function say(text) {
+  $("gameMessage").textContent = text;
+}
+
+function nameValue() {
+  const name = $("nickname").value.trim();
+  if (!name) {
+    status("Escribe tu nombre para comenzar.");
+    return null;
+  }
+  return name;
 }
 
 async function authenticate() {
@@ -88,21 +94,12 @@ async function authenticate() {
   }
 }
 
-function getName() {
-  const name = $("nickname").value.trim();
-  if (!name) {
-    setStatus("¡Escribe tu nombre antes de comenzar!");
-    return null;
-  }
-  return name;
-}
-
 async function createRoom() {
-  const nickname = getName();
+  const nickname = nameValue();
   if (!nickname) return;
 
   try {
-    setStatus("🌴 Preparando la isla...");
+    status("🌴 Creando tu aventura...");
     await authenticate();
 
     roomCode = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -110,131 +107,378 @@ async function createRoom() {
     const { data, error } = await db.rpc("create_game_room", {
       p_code: roomCode,
       p_nickname: nickname,
-      p_character: characterInfo[selectedCharacter].emoji
+      p_character: characters[selectedCharacter].emoji
     });
 
     if (error) throw error;
-
     roomId = data;
-    await enterGame();
+    await enterRoom();
   } catch (error) {
-    setStatus("No se pudo crear la sala: " + error.message);
+    status("No se pudo crear: " + error.message);
   }
 }
 
 async function joinRoom() {
-  const nickname = getName();
+  const nickname = nameValue();
   if (!nickname) return;
 
   roomCode = $("roomCode").value.trim().toUpperCase();
   if (!roomCode) {
-    setStatus("Escribe el código de la aventura.");
+    status("Escribe el código de la sala.");
     return;
   }
 
   try {
-    setStatus("🔎 Buscando la isla...");
+    status("🔎 Buscando la aventura...");
     await authenticate();
 
     const { data, error } = await db.rpc("join_game_room", {
       p_code: roomCode,
       p_nickname: nickname,
-      p_character: characterInfo[selectedCharacter].emoji
+      p_character: characters[selectedCharacter].emoji
     });
 
     if (error) throw error;
-
     roomId = data;
-    await enterGame();
+    await enterRoom();
   } catch (error) {
-    setStatus("No se pudo entrar: " + error.message);
+    status("No se pudo entrar: " + error.message);
   }
 }
 
-async function enterGame() {
+async function enterRoom() {
   $("lobby").classList.add("hidden");
-  $("game").classList.remove("hidden");
-
-  $("roomLabel").textContent = "Código: " + roomCode;
-  player.x = 80;
-  player.y = 340;
-  player.vy = 0;
-
-  say("¡La isla está llena de secretos! Encuentra la llave.");
+  $("mapScreen").classList.remove("hidden");
+  $("mapRoom").textContent = "Código de sala: " + roomCode;
 
   await loadPlayers();
-  subscribeToPlayers();
-
-  running = true;
-  requestAnimationFrame(loop);
+  await connectRealtime();
+  updateMap();
 }
 
 async function loadPlayers() {
   const { data, error } = await db.from("game_players")
-    .select("*")
-    .eq("room_id", roomId);
+    .select("*").eq("room_id", roomId);
 
   if (error) {
-    say("Error cargando jugadores: " + error.message);
+    $("mapPlayers").textContent = "👥 Error";
     return;
   }
 
-  const others = data.filter(p => p.user_id !== user.id);
+  $("mapPlayers").textContent = "👥 " + data.length + "/2";
 
-  if (others.length) {
+  const other = data.find(p => p.user_id !== user.id);
+  if (other) {
     otherPlayer = {
-      x: Number(others[0].x) || 150,
-      y: Number(others[0].y) || 340,
-      character: others[0].character || "🌙",
-      nickname: others[0].nickname || "Explorador"
+      x: Number(other.x) || 100,
+      y: Number(other.y) || 300,
+      level: Number(other.level) || 0,
+      character: other.character || "🌙",
+      nickname: other.nickname || "Compañero"
     };
-  } else {
-    otherPlayer = null;
   }
-
-  $("playersLabel").textContent = "👥 " + data.length + "/2";
 }
 
-function subscribeToPlayers() {
-  if (channel) db.removeChannel(channel);
+async function connectRealtime() {
+  if (channel) await db.removeChannel(channel);
 
-  channel = db.channel("island-" + roomId)
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "game_players",
-      filter: "room_id=eq." + roomId
-    }, payload => {
-      if (payload.new && payload.new.user_id !== user.id) {
-        otherPlayer = {
-          x: Number(payload.new.x) || 150,
-          y: Number(payload.new.y) || 340,
-          character: payload.new.character || "🌙",
-          nickname: payload.new.nickname || "Explorador"
-        };
-        loadPlayers();
-      }
+  channel = db.channel("treasure-" + roomId);
+
+  channel
+    .on("broadcast", { event: "position" }, ({ payload }) => {
+      if (!payload || payload.user_id === user.id) return;
+      otherPlayer = payload;
     })
-    .subscribe();
+    .on("broadcast", { event: "shared_progress" }, ({ payload }) => {
+      if (!payload) return;
+      applyProgress(payload);
+    })
+    .on("broadcast", { event: "player_count" }, () => {
+      loadPlayers();
+    })
+    .subscribe(state => {
+      if (state === "SUBSCRIBED") {
+        broadcast("player_count", {});
+        say("🟢 Conectados. ¡La aventura comienza!");
+      }
+    });
 }
 
-async function syncPlayer() {
-  if (!roomId || !user) return;
+function broadcast(event, payload) {
+  if (!channel) return;
+  channel.send({
+    type: "broadcast",
+    event,
+    payload
+  }).catch(console.error);
+}
+
+function broadcastPosition() {
+  if (!channel || !user) return;
 
   const now = Date.now();
-  if (now - lastSync < 150) return;
+  if (now - lastSync < 80) return;
   lastSync = now;
 
-  const { error } = await db.from("game_players").upsert({
-    room_id: roomId,
+  broadcast("position", {
     user_id: user.id,
-    nickname: $("nickname").value.trim(),
-    character: characterInfo[selectedCharacter].emoji,
     x: Math.round(player.x),
-    y: Math.round(player.y)
-  }, { onConflict: "room_id,user_id" });
+    y: Math.round(player.y),
+    level,
+    character: characters[selectedCharacter].emoji,
+    nickname: $("nickname").value.trim()
+  });
+}
 
-  if (error) console.error(error.message);
+function getProgress() {
+  return {
+    unlocked,
+    coins,
+    gems,
+    level,
+    collected: Array.from(collected),
+    hasMissionItem,
+    levelComplete
+  };
+}
+
+function applyProgress(data) {
+  if (typeof data.unlocked === "number") unlocked = Math.max(unlocked, data.unlocked);
+  if (typeof data.coins === "number") coins = Math.max(coins, data.coins);
+  if (typeof data.gems === "number") gems = Math.max(gems, data.gems);
+
+  if (Array.isArray(data.collected)) {
+    data.collected.forEach(id => collected.add(id));
+  }
+
+  if (data.level === level) {
+    hasMissionItem = hasMissionItem || !!data.hasMissionItem;
+    levelComplete = levelComplete || !!data.levelComplete;
+  }
+
+  updateHUD();
+  updateMap();
+}
+
+function shareProgress() {
+  broadcast("shared_progress", getProgress());
+}
+
+function updateMap() {
+  $("mapCoins").textContent = "🪙 " + coins;
+  $("mapGems").textContent = "💎 " + gems;
+
+  document.querySelectorAll(".island-card").forEach(card => {
+    const index = Number(card.dataset.level);
+    card.classList.toggle("unlocked", index <= unlocked);
+    card.classList.toggle("locked", index > unlocked);
+    card.querySelector("small").textContent =
+      index <= unlocked ? levels[index].mission : "🔒 Bloqueada";
+  });
+
+  $("mapMessage").textContent =
+    "Islas desbloqueadas: " + (unlocked + 1) + " de 5.";
+}
+
+document.querySelectorAll(".island-card").forEach(card => {
+  card.addEventListener("click", () => {
+    const index = Number(card.dataset.level);
+
+    if (index > unlocked) {
+      $("mapMessage").textContent = "🔒 Completa la isla anterior primero.";
+      return;
+    }
+
+    startLevel(index);
+  });
+});
+
+function startLevel(index) {
+  level = index;
+  player.x = 70;
+  player.y = 300;
+  player.vx = 0;
+  player.vy = 0;
+  camera = 0;
+  hearts = 3;
+  levelComplete = false;
+  hasMissionItem = false;
+  collected = new Set();
+
+  generateLevel(index);
+
+  $("mapScreen").classList.add("hidden");
+  $("gameScreen").classList.remove("hidden");
+  $("levelTitle").textContent = levels[index].icon + " " + levels[index].name;
+  $("roomTitle").textContent = "Sala: " + roomCode;
+  $("questText").textContent = levels[index].mission;
+
+  updateHUD();
+  running = true;
+  say("¡Explora, encuentra secretos y ayuda a tu compañero!");
+  requestAnimationFrame(loop);
+}
+
+function generateLevel(index) {
+  gameWidth = 2800;
+  platforms = [{ x: 0, y: 420, w: gameWidth, h: 80 }];
+  objects = [];
+  enemies = [];
+  particles = [];
+
+  const platformPositions = [
+    [240, 340], [500, 285], [790, 350],
+    [1060, 300], [1350, 250], [1640, 340],
+    [1940, 290], [2240, 330], [2520, 270]
+  ];
+
+  platformPositions.forEach(([x, y], i) => {
+    platforms.push({ x, y, w: 130 + (i % 3) * 25, h: 18 });
+  });
+
+  const itemEmoji = ["🗺️", "🗝️", "💎", "🔥", "👑"][index];
+
+  for (let i = 0; i < 14; i++) {
+    objects.push({
+      id: "coin-" + index + "-" + i,
+      type: "coin",
+      x: 180 + i * 175,
+      y: 360 - (i % 3) * 55,
+      emoji: "🪙"
+    });
+  }
+
+  for (let i = 0; i < 5; i++) {
+    objects.push({
+      id: "gem-" + index + "-" + i,
+      type: "gem",
+      x: 350 + i * 440,
+      y: 230 + (i % 2) * 50,
+      emoji: "💎"
+    });
+  }
+
+  objects.push({
+    id: "mission-" + index,
+    type: "mission",
+    x: 2380,
+    y: 355,
+    emoji: itemEmoji
+  });
+
+  for (let i = 0; i < 7; i++) {
+    enemies.push({
+      x: 400 + i * 340,
+      y: 385,
+      start: 370 + i * 340,
+      end: 540 + i * 340,
+      dir: 1,
+      alive: true,
+      type: index === 3 ? "🔥" : index === 2 ? "🦇" : "👾"
+    });
+  }
+
+  objects.push({
+    id: "exit-" + index,
+    type: "exit",
+    x: 2670,
+    y: 365,
+    emoji: index === 4 ? "🏆" : "🚪"
+  });
+}
+
+function updateHUD() {
+  $("hearts").textContent = "❤️".repeat(Math.max(0, hearts)) +
+    "🖤".repeat(Math.max(0, 3 - hearts));
+  $("coins").textContent = "🪙 " + coins;
+  $("gems").textContent = "💎 " + gems;
+  $("keys").textContent = hasMissionItem ? "🗝️ 1" : "🗝️ 0";
+}
+
+function drawBackground() {
+  const colors = [
+    ["#62d3e9", "#b8edc8"],
+    ["#64c9a2", "#b2df85"],
+    ["#403b79", "#8a74b7"],
+    ["#ff9d55", "#d95642"],
+    ["#5d9ed0", "#b5b6e8"]
+  ];
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, 500);
+  gradient.addColorStop(0, colors[level][0]);
+  gradient.addColorStop(1, colors[level][1]);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 960, 500);
+
+  ctx.save();
+  ctx.translate(-camera * 0.25, 0);
+
+  for (let x = 0; x < gameWidth + 400; x += 380) {
+    ctx.fillStyle = level === 3 ? "#a74d42" : "#5cae83";
+    ctx.beginPath();
+    ctx.moveTo(x, 420);
+    ctx.lineTo(x + 170, 170 + (x % 3) * 30);
+    ctx.lineTo(x + 340, 420);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  ctx.font = "40px serif";
+  ctx.fillText(levels[level].icon, 30, 75);
+  ctx.fillText("☁️", 400 - camera * .1 % 100, 90);
+}
+
+function drawWorld() {
+  drawBackground();
+  ctx.save();
+  ctx.translate(-camera, 0);
+
+  // Suelo y plataformas
+  for (const p of platforms) {
+    roundedRect(p.x, p.y, p.w, p.h, 7, level === 3 ? "#914b38" : "#95613e");
+    roundedRect(p.x, p.y, p.w, 9, 5, level === 3 ? "#ef7849" : "#58b957");
+  }
+
+  // Trampas
+  for (let x = 650; x < gameWidth; x += 700) {
+    ctx.fillStyle = "#ed6060";
+    for (let n = 0; n < 4; n++) {
+      ctx.beginPath();
+      ctx.moveTo(x + n * 15, 420);
+      ctx.lineTo(x + 7 + n * 15, 395);
+      ctx.lineTo(x + 15 + n * 15, 420);
+      ctx.fill();
+    }
+  }
+
+  // Objetos
+  for (const obj of objects) {
+    if (collected.has(obj.id)) continue;
+    ctx.font = obj.type === "exit" ? "52px serif" : "31px serif";
+    ctx.textAlign = "center";
+    ctx.fillText(obj.emoji, obj.x, obj.y);
+  }
+
+  // Enemigos
+  for (const enemy of enemies) {
+    if (!enemy.alive) continue;
+    ctx.font = "34px serif";
+    ctx.textAlign = "center";
+    ctx.fillText(enemy.type, enemy.x, enemy.y);
+  }
+
+  // Otro jugador, solo si está en la misma isla
+  if (otherPlayer && otherPlayer.level === level) {
+    drawCharacter(otherPlayer.x, otherPlayer.y,
+      otherPlayer.character, otherPlayer.nickname, false);
+  }
+
+  drawCharacter(player.x, player.y,
+    characters[selectedCharacter].emoji,
+    $("nickname").value, true);
+
+  ctx.restore();
 }
 
 function roundedRect(x, y, w, h, r, color) {
@@ -244,214 +488,142 @@ function roundedRect(x, y, w, h, r, color) {
   ctx.fill();
 }
 
-function drawSky() {
-  const sky = ctx.createLinearGradient(0, 0, 0, 480);
-  sky.addColorStop(0, "#59c9ed");
-  sky.addColorStop(1, "#d7f4d5");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, 960, 480);
+function drawCharacter(x, y, emoji, nickname, isMe) {
+  const info = Object.values(characters).find(c => c.emoji === emoji) || characters.nico;
 
-  // Sol
-  ctx.fillStyle = "#ffe37b";
+  ctx.fillStyle = "#244d4b55";
   ctx.beginPath();
-  ctx.arc(810, 78, 42, 0, Math.PI * 2);
+  ctx.ellipse(x + 17, y + 46, 18, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Nubes
-  for (const [x, y] of [[100, 90], [390, 65], [650, 140]]) {
-    ctx.fillStyle = "#ffffffd9";
-    ctx.beginPath();
-    ctx.arc(x, y, 22, 0, Math.PI * 2);
-    ctx.arc(x + 25, y - 9, 28, 0, Math.PI * 2);
-    ctx.arc(x + 52, y, 20, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Montañas
-  ctx.fillStyle = "#75bd94";
-  for (let x = -50; x < 1000; x += 230) {
-    ctx.beginPath();
-    ctx.moveTo(x, 405);
-    ctx.lineTo(x + 110, 185);
-    ctx.lineTo(x + 240, 405);
-    ctx.fill();
-  }
-
-  // Palmeras
-  for (const x of [75, 170, 740, 940]) {
-    ctx.fillStyle = "#98613b";
-    ctx.fillRect(x, 300, 13, 110);
-    ctx.fillStyle = "#238a55";
-
-    for (let a = 0; a < 5; a++) {
-      ctx.save();
-      ctx.translate(x + 7, 303);
-      ctx.rotate(a * Math.PI * 0.4);
-      ctx.beginPath();
-      ctx.ellipse(0, -28, 12, 34, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  // Cueva
-  ctx.fillStyle = "#8c6042";
-  ctx.beginPath();
-  ctx.arc(870, 407, 66, Math.PI, 0);
-  ctx.fill();
-  ctx.fillRect(804, 407, 132, 35);
-
-  ctx.fillStyle = "#292b48";
-  ctx.beginPath();
-  ctx.arc(870, 410, 43, Math.PI, 0);
-  ctx.fill();
-  ctx.fillRect(827, 410, 86, 30);
-}
-
-function drawWorld() {
-  drawSky();
-
-  // Suelo y plataformas
-  for (const p of platforms) {
-    roundedRect(p.x, p.y, p.w, p.h, 6, "#9b633d");
-    roundedRect(p.x, p.y, p.w, 9, 5, "#58b957");
-    ctx.fillStyle = "#8cdb64";
-    for (let x = p.x + 12; x < p.x + p.w; x += 28) {
-      ctx.fillRect(x, p.y - 3, 5, 5);
-    }
-  }
-
-  // Trampas
-  for (const t of traps) {
-    ctx.fillStyle = "#ef6464";
-    for (let x = t.x; x < t.x + t.w; x += 13) {
-      ctx.beginPath();
-      ctx.moveTo(x, 405);
-      ctx.lineTo(x + 7, 386);
-      ctx.lineTo(x + 14, 405);
-      ctx.fill();
-    }
-  }
-
-  // Gemas
-  for (const g of gemItems) {
-    if (g.taken) continue;
-    ctx.font = "27px serif";
-    ctx.fillText("💎", g.x, g.y);
-  }
-
-  if (!keyItem.found) {
-    ctx.font = "30px serif";
-    ctx.fillText("🗝️", keyItem.x, keyItem.y);
-  }
-
-  ctx.font = "44px serif";
-  ctx.fillText(openedChest ? "📦" : "🧰", chest.x, chest.y);
-}
-
-function drawCharacter(x, y, character, nickname, isMe) {
-  const info = Object.values(characterInfo)
-    .find(c => c.emoji === character) || characterInfo.nico;
-
-  // Sombra
-  ctx.fillStyle = "#245b4b55";
-  ctx.beginPath();
-  ctx.ellipse(x + 17, y + 46, 17, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cuerpo
   roundedRect(x + 5, y + 18, 25, 27, 9, info.color);
-
-  // Piernas
   roundedRect(x + 7, y + 39, 8, 9, 3, "#51443a");
   roundedRect(x + 21, y + 39, 8, 9, 3, "#51443a");
 
-  // Cabeza
   ctx.fillStyle = "#ffcf9d";
   ctx.beginPath();
   ctx.arc(x + 17, y + 14, 13, 0, Math.PI * 2);
   ctx.fill();
 
-  // Pelo
-  ctx.fillStyle = "#51352c";
-  ctx.beginPath();
-  ctx.arc(x + 17, y + 9, 13, Math.PI, Math.PI * 2);
-  ctx.fill();
-
-  // Accesorio del personaje
-  ctx.font = "19px serif";
+  ctx.font = "18px serif";
   ctx.textAlign = "center";
-  ctx.fillText(character, x + 17, y + 12);
+  ctx.fillText(emoji, x + 17, y + 12);
 
-  // Ojos
   ctx.fillStyle = "#302b29";
   ctx.beginPath();
-  ctx.arc(x + 12, y + 15, 1.8, 0, Math.PI * 2);
-  ctx.arc(x + 22, y + 15, 1.8, 0, Math.PI * 2);
+  ctx.arc(x + 12, y + 15, 1.7, 0, Math.PI * 2);
+  ctx.arc(x + 22, y + 15, 1.7, 0, Math.PI * 2);
   ctx.fill();
 
-  // Nombre
   ctx.font = "bold 12px Nunito";
-  ctx.fillStyle = "#174c43";
-  ctx.fillText(isMe ? "TÚ" : (nickname || "Compañero"), x + 17, y - 5);
+  ctx.fillStyle = "#173f39";
+  ctx.fillText(isMe ? "TÚ" : nickname, x + 17, y - 6);
 }
 
-function updatePlayer() {
+function movePlayer() {
   const left = keys.ArrowLeft || keys.a || keys.A;
   const right = keys.ArrowRight || keys.d || keys.D;
   const jump = keys.ArrowUp || keys.w || keys.W || keys[" "];
 
-  player.vx = left ? -4 : right ? 4 : 0;
-  player.x = Math.max(0, Math.min(925, player.x + player.vx));
+  player.vx = left ? -4.5 : right ? 4.5 : 0;
+  if (player.vx !== 0) player.facing = Math.sign(player.vx);
 
-  player.vy += 0.55;
+  player.x = Math.max(0, Math.min(gameWidth - player.w, player.x + player.vx));
+
+  player.vy += .58;
   player.y += player.vy;
   player.onGround = false;
 
   for (const p of platforms) {
-    const wasAbove = player.y + player.height - player.vy <= p.y;
-    const overlaps = player.x + player.width > p.x &&
-      player.x < p.x + p.w;
+    const wasAbove = player.y + player.h - player.vy <= p.y;
+    const overlaps = player.x + player.w > p.x && player.x < p.x + p.w;
 
     if (overlaps && wasAbove &&
-        player.y + player.height >= p.y &&
-        player.vy >= 0) {
-      player.y = p.y - player.height;
+        player.y + player.h >= p.y && player.vy >= 0) {
+      player.y = p.y - player.h;
       player.vy = 0;
       player.onGround = true;
     }
   }
 
   if (jump && player.onGround) {
-    player.vy = -11;
+    player.vy = -12;
     player.onGround = false;
   }
 
-  if (player.y > 500) {
-    player.x = 80;
-    player.y = 340;
-    player.vy = 0;
-    say("¡Ups! Vuelve a intentarlo.");
+  if (player.y > 550) {
+    loseHeart("¡Caíste! Intenta de nuevo.");
   }
 
-  for (const t of traps) {
-    if (player.x + 27 > t.x && player.x < t.x + t.w &&
-        player.y + player.height > t.y) {
-      player.x = 80;
-      player.y = 340;
-      player.vy = 0;
-      say("¡Cuidado con las trampas! Salta sobre ellas.");
+  // Recoger objetos
+  for (const obj of objects) {
+    if (collected.has(obj.id)) continue;
+
+    if (Math.abs(player.x - obj.x) < 35 &&
+        Math.abs(player.y - obj.y) < 55) {
+      if (obj.type === "coin") {
+        collected.add(obj.id);
+        coins++;
+        say("🪙 ¡Moneda encontrada!");
+        updateHUD();
+        shareProgress();
+      } else if (obj.type === "gem") {
+        collected.add(obj.id);
+        gems++;
+        say("💎 ¡Cristal mágico encontrado!");
+        updateHUD();
+        shareProgress();
+      } else if (obj.type === "mission") {
+        hasMissionItem = true;
+        collected.add(obj.id);
+        say("✨ ¡Encontraste el objeto de la misión!");
+        shareProgress();
+        updateHUD();
+      }
     }
   }
 
-  for (const g of gemItems) {
-    if (!g.taken && Math.abs(player.x - g.x) < 28 &&
-        Math.abs(player.y - g.y) < 42) {
-      g.taken = true;
-      gems++;
-      $("gemLabel").textContent = "💎 " + gems;
-      say("¡Gema encontrada! Sigue buscando.");
+  // Enemigos
+  for (const enemy of enemies) {
+    if (!enemy.alive) continue;
+
+    enemy.x += enemy.dir * 1.1;
+    if (enemy.x < enemy.start || enemy.x > enemy.end) {
+      enemy.dir *= -1;
     }
+
+    if (Math.abs(player.x - enemy.x) < 30 &&
+        Math.abs(player.y - enemy.y) < 40) {
+      if (keys.x || keys.X) {
+        enemy.alive = false;
+        say("✨ ¡Superaste al guardián!");
+      } else if (Date.now() - lastDamage > 1200) {
+        loseHeart("¡Un guardián te tocó! Evítalo o pulsa X.");
+      }
+    }
+  }
+
+  // Cámara que sigue al jugador
+  camera = Math.max(0, Math.min(gameWidth - canvas.width,
+    player.x - canvas.width * .42));
+}
+
+function loseHeart(message) {
+  if (Date.now() - lastDamage < 1200) return;
+  lastDamage = Date.now();
+  hearts--;
+  player.x = Math.max(30, player.x - 100);
+  player.y = 300;
+  player.vy = 0;
+  updateHUD();
+  say(message);
+
+  if (hearts <= 0) {
+    hearts = 3;
+    player.x = 70;
+    player.y = 300;
+    updateHUD();
+    say("💫 Te recuperaste en el punto de inicio. ¡Sigue intentando!");
   }
 }
 
@@ -459,61 +631,43 @@ function interact() {
   if (Date.now() - lastAction < 350) return;
   lastAction = Date.now();
 
-  if (!keyItem.found &&
-      Math.abs(player.x - keyItem.x) < 55 &&
-      Math.abs(player.y - keyItem.y) < 65) {
-    keyItem.found = true;
-    hasKey = true;
-    $("keyLabel").textContent = "🗝️ Llave encontrada";
-    say("¡Encontraste la llave! Ahora ve al cofre.");
+  const exit = objects.find(o => o.type === "exit");
+  if (!exit || Math.abs(player.x - exit.x) > 65) {
+    say("🔍 Sigue explorando. ¡Busca el final de la isla!");
     return;
   }
 
-  if (Math.abs(player.x - chest.x) < 65 &&
-      Math.abs(player.y - chest.y) < 85) {
-    if (!hasKey) {
-      say("🔒 El cofre está cerrado. ¡Busca la llave dorada!");
-    } else if (!openedChest) {
-      openedChest = true;
-      say("🎉 ¡LO LOGRARON! ¡Encontraron el Gran Tesoro!");
-    } else {
-      say("¡El tesoro pertenece a los dos exploradores!");
-    }
+  if (!hasMissionItem) {
+    say("🔒 Todavía falta el objeto de la misión. ¡Explora la isla!");
     return;
   }
 
-  if (player.x > 790 && player.y > 320) {
-    say("⛏️ ¡Encontraste la entrada de la cueva!");
-  } else {
-    say("🔍 Aquí no hay nada. ¡Sigue explorando!");
+  if (!levelComplete) {
+    levelComplete = true;
+    unlocked = Math.max(unlocked, Math.min(4, level + 1));
+    say(level === 4
+      ? "🏆 ¡ENCONTRARON EL GRAN TESORO! ¡Aventura completada!"
+      : "🎉 ¡Isla completada! ¡La siguiente isla está desbloqueada!");
+
+    shareProgress();
+    setTimeout(() => {
+      running = false;
+      $("gameScreen").classList.add("hidden");
+      $("mapScreen").classList.remove("hidden");
+      updateMap();
+    }, 1700);
   }
 }
 
 function loop() {
   if (!running) return;
 
-  updatePlayer();
+  movePlayer();
   drawWorld();
-
-  drawCharacter(
-    player.x, player.y,
-    characterInfo[selectedCharacter].emoji,
-    $("nickname").value,
-    true
-  );
-
-  if (otherPlayer) {
-    drawCharacter(
-      otherPlayer.x, otherPlayer.y,
-      otherPlayer.character,
-      otherPlayer.nickname,
-      false
-    );
-  }
 
   if (keys.e || keys.E) interact();
 
-  syncPlayer();
+  broadcastPosition();
   requestAnimationFrame(loop);
 }
 
@@ -528,10 +682,18 @@ window.addEventListener("keyup", e => {
   keys[e.key] = false;
 });
 
+function returnToMap() {
+  running = false;
+  $("gameScreen").classList.add("hidden");
+  $("mapScreen").classList.remove("hidden");
+  updateMap();
+}
+
 $("createBtn").addEventListener("click", createRoom);
 $("joinBtn").addEventListener("click", joinRoom);
+$("mapBtn").addEventListener("click", returnToMap);
 
-$("leaveBtn").addEventListener("click", async () => {
+async function leaveRoom() {
   running = false;
   if (channel) await db.removeChannel(channel);
 
@@ -539,7 +701,11 @@ $("leaveBtn").addEventListener("click", async () => {
   roomId = null;
   otherPlayer = null;
 
-  $("game").classList.add("hidden");
+  $("gameScreen").classList.add("hidden");
+  $("mapScreen").classList.add("hidden");
   $("lobby").classList.remove("hidden");
-  say("¡Hasta la próxima aventura!");
-});
+  status("¡Puedes crear otra aventura!");
+}
+
+$("exitBtn").addEventListener("click", leaveRoom);
+$("backLobby").addEventListener("click", leaveRoom);
