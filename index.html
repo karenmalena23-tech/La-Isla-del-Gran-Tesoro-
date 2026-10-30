@@ -92,7 +92,12 @@
 
       <h3>🏁 Conclusión del equipo</h3>
       <p>Escriban a quién consideran responsable y expliquen sus pruebas.</p>
-      <input id="final-suspect" placeholder="¿Quién creen que movió el trofeo?">
+      <select id="final-suspect">
+  <option value="">Elige al sospechoso</option>
+  <option value="Lucía">Lucía</option>
+  <option value="Mateo">Mateo</option>
+  <option value="Sofía">Sofía</option>
+</select>
       <textarea id="final-reason" maxlength="500" placeholder="¿Cuál fue el motivo y qué pistas lo demuestran?"></textarea>
       <button class="main-button" id="submit-conclusion">Enviar conclusión</button>
       <p id="final-message" class="message"></p>
