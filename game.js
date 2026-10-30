@@ -1,14 +1,12 @@
 
-/* ==================================================
-   LA ISLA DEL GRAN TESORO
-   Carrera automática multijugador
-   Saltos, plataformas, Supabase y ganador automático
-   ================================================== */
+// ==================================================
+// LA ISLA DEL GRAN TESORO
+// Multijugador, movimiento manual y Supabase
+// ==================================================
 
 // ---------------- SUPABASE ----------------
 
-const SUPABASE_URL =
-  "https://byvfpocakysizleuzypp.supabase.co";
+const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
   "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
@@ -34,11 +32,7 @@ const PLAYER_HALF_HEIGHT = 24;
 
 const GRAVITY = 0.65;
 const JUMP_FORCE = -13;
-
-// Velocidad automática: aproximadamente 13 píxeles por segundo.
-const AUTO_RUN_SPEED = 0.22;
-
-// Guardar posiciones en Supabase cada 200 ms.
+const PLAYER_SPEED = 5;
 const SAVE_INTERVAL = 200;
 
 const TREASURES = [
@@ -314,9 +308,7 @@ async function loadRoom() {
         player => player.id === currentPlayer.id
       );
 
-      if (updated) {
-        currentPlayer = updated;
-      }
+      if (updated) currentPlayer = updated;
     }
 
     if (roomData) {
@@ -375,7 +367,7 @@ async function advanceRoomState() {
   render();
   updateTimer();
 
-  setMessage("¡La carrera comenzó! ¡Salta los obstáculos!");
+  setMessage("¡La carrera comenzó! ¡Avanza y salta los obstáculos!");
 }
 
 // ---------------- DIBUJAR JUEGO ----------------
@@ -745,7 +737,7 @@ function subscribeToRoom() {
     });
 }
 
-// ---------------- SALTO ----------------
+// ---------------- SALTO Y FÍSICA ----------------
 
 function jumpPlayer() {
   if (!currentPlayer || roomStatus !== "racing") return;
@@ -811,9 +803,9 @@ function physicsStep() {
   );
 }
 
-// ---------------- CARRERA AUTOMÁTICA ----------------
+// ---------------- MOVIMIENTO MANUAL ----------------
 
-function autoRunStep(deltaTime) {
+function movePlayer(direction) {
   if (
     !currentPlayer ||
     roomStatus !== "racing" ||
@@ -821,32 +813,30 @@ function autoRunStep(deltaTime) {
     busy
   ) return;
 
-  let newX = Number(currentPlayer.x);
-
-  const nextX = Math.min(
-    FINISH_X,
-    newX + AUTO_RUN_SPEED * deltaTime
-  );
-
-  // El capitán se detiene frente a los obstáculos
-  // si todavía no ha saltado lo suficiente.
-  const blockingObstacle = OBSTACLES.find(obstacle => {
-    const approaching =
-      nextX >= obstacle.x - 30 &&
-      newX <= obstacle.x + 30;
-
-    const notHighEnough =
-      Number(currentPlayer.y) > obstacle.y - 55;
-
-    return approaching && notHighEnough;
-  });
-
-  if (blockingObstacle) {
-    setMessage("¡Salta ahora para superar el obstáculo!");
-    return;
+  if (direction === "right") {
+    currentPlayer.x = Math.min(
+      FINISH_X,
+      Number(currentPlayer.x) + PLAYER_SPEED
+    );
   }
 
-  currentPlayer.x = nextX;
+  if (direction === "left") {
+    currentPlayer.x = Math.max(
+      PLAYER_START_X,
+      Number(currentPlayer.x) - PLAYER_SPEED
+    );
+  }
+
+  if (direction === "up") {
+    jumpPlayer();
+  }
+
+  if (direction === "down") {
+    currentPlayer.y = Math.min(
+      GROUND_TOP - PLAYER_HALF_HEIGHT,
+      Number(currentPlayer.y) + PLAYER_SPEED
+    );
+  }
 
   drawPirate(
     currentPlayer.role === "red" ? "pirateA" : "pirateB",
@@ -855,7 +845,7 @@ function autoRunStep(deltaTime) {
 
   updateCamera();
 
-  if (nextX >= FINISH_X) {
+  if (Number(currentPlayer.x) >= FINISH_X) {
     markFinished().catch(console.error);
   }
 }
@@ -911,14 +901,11 @@ function gameStep() {
     return;
   }
 
-  const deltaTime = Math.min(now - lastFrameTime, 50);
-
   lastFrameTime = now;
 
   if (roomStatus !== "racing" || !currentPlayer) return;
 
   physicsStep();
-  autoRunStep(deltaTime);
 
   if (now - lastSaveTime >= SAVE_INTERVAL) {
     lastSaveTime = now;
@@ -952,7 +939,6 @@ async function markFinished() {
 
   currentPlayer = data;
 
-  // La función SQL garantiza que solo haya un ganador.
   const { data: winnerData, error: winnerError } =
     await supabaseClient.rpc("claim_race_winner", {
       p_room_code: roomCode,
@@ -1260,12 +1246,7 @@ function setupControls() {
 
   document.querySelectorAll("[data-move]").forEach(button => {
     button.addEventListener("click", () => {
-      if (
-        button.dataset.move === "up" ||
-        button.dataset.move === "jump"
-      ) {
-        jumpPlayer();
-      }
+      movePlayer(button.dataset.move);
     });
   });
 
@@ -1278,15 +1259,21 @@ function setupControls() {
       return;
     }
 
-    if (
-      event.code === "Space" ||
-      event.key === "ArrowUp" ||
-      event.key.toLowerCase() === "w"
-    ) {
+    const keys = {
+      ArrowRight: "right",
+      ArrowLeft: "left",
+      ArrowUp: "up",
+      ArrowDown: "down",
+      " ": "up"
+    };
+
+    const direction = keys[event.key];
+
+    if (direction) {
       event.preventDefault();
 
-      if (!event.repeat) {
-        jumpPlayer();
+      if (!event.repeat || direction !== "up") {
+        movePlayer(direction);
       }
     }
   });
