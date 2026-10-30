@@ -8,116 +8,99 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <main class="game-container">
-
     <header class="top">
-      <span class="game-label">🔎 MISTERIO • ACERTIJOS • DUELO</span>
+      <span class="game-label">🔎 INVESTIGACIÓN COOPERATIVA</span>
       <h1>DETECTIVES <span>EN DUELO</span></h1>
-      <p>Dos detectives, un misterio... ¿quién lo resolverá primero?</p>
+      <p>Dos detectives, un equipo y un misterio por resolver.</p>
     </header>
 
-    <section class="detectives">
-      <div class="detective detective-one">🕵️</div>
-      <div class="versus">VS</div>
-      <div class="detective detective-two">🕵️‍♀️</div>
-    </section>
-
     <section class="panel" id="home-screen">
-      <h2>¡Comienza la investigación!</h2>
-      <p>Juega con otra persona y demuestra quién es el mejor detective.</p>
+      <h2>🕵️ ¡Comienza la investigación!</h2>
+      <p>Juega con otra persona. Juntos deberán descubrir la verdad.</p>
 
-      <button class="main-button" id="create-button">
-        🎮 Crear partida
-      </button>
+      <label for="nickname">Tu nombre de detective</label>
+      <input id="nickname" maxlength="20" placeholder="Ej. Detective Alex">
 
-      <button class="second-button" id="join-button">
-        🔑 Unirse a una partida
-      </button>
+      <button class="main-button" id="create-button">🎮 Crear sala</button>
 
-      <div id="home-message" class="message"></div>
+      <div class="separator">O únete a una sala</div>
+      <input id="room-input" maxlength="6" placeholder="Código de sala">
+      <button class="second-button" id="join-button">🔑 Unirme</button>
+      <p id="home-message" class="message"></p>
     </section>
 
     <section class="panel hidden" id="room-screen">
-      <h2>🗝️ Tu sala de investigación</h2>
+      <h2>🗝️ Sala de investigación</h2>
       <p>Comparte este código con tu compañero:</p>
-
       <div class="room-code" id="room-code">------</div>
+      <button class="second-button" id="copy-button">📋 Copiar código</button>
 
-      <button class="second-button" id="copy-button">
-        📋 Copiar código
-      </button>
+      <h3>Detectives conectados</h3>
+      <div id="players-list">Esperando jugadores...</div>
+      <p id="ready-status" class="message">Esperando a los dos detectives.</p>
 
-      <p class="small-note">
-        Esta es una sala de demostración. La conexión real entre dispositivos
-        se añadirá al conectar Supabase.
-      </p>
-
-      <button class="main-button" id="back-room-button">
-        Volver al inicio
-      </button>
-    </section>
-
-    <section class="panel hidden" id="join-screen">
-      <h2>🔐 Entrar a una partida</h2>
-      <p>Escribe el código que te compartió el otro detective.</p>
-
-      <input
-        id="room-input"
-        type="text"
-        maxlength="6"
-        placeholder="Ejemplo: LUPA27"
-        autocomplete="off"
-      >
-
-      <button class="main-button" id="enter-button">
-        Entrar
-      </button>
-
-      <div id="join-message" class="message"></div>
-
-      <button class="second-button" id="back-join-button">
-        Volver
-      </button>
+      <button class="main-button" id="ready-button">✅ Estoy listo</button>
+      <p class="small-note">La investigación comenzará cuando ambos estén listos.</p>
     </section>
 
     <section class="panel hidden" id="game-screen">
-      <div class="game-info">
-        <span>⭐ Puntos: <strong id="score">0</strong></span>
-        <span>⏱️ Tiempo: <strong id="timer">20</strong>s</span>
-      </div>
-
-      <div class="progress">
-        <div id="progress-bar"></div>
-      </div>
-
       <span class="case-label">CASO #001</span>
-      <h2>🕵️ El acertijo misterioso</h2>
+      <h2>🕵️ El misterio del trofeo desaparecido</h2>
+      <p class="case-story">
+        Durante la feria escolar, el trofeo del concurso desapareció
+        de la vitrina. Tres personas estuvieron cerca del salón.
+        ¡Descubran qué ocurrió!
+      </p>
 
+      <h3>📂 Sospechosos</h3>
+      <div class="suspects">
+        <div class="suspect"><strong>Lucía</strong><p>Organizaba las decoraciones.</p></div>
+        <div class="suspect"><strong>Mateo</strong><p>Estaba preparando los carteles.</p></div>
+        <div class="suspect"><strong>Sofía</strong><p>Ayudaba con las fotografías.</p></div>
+      </div>
+
+      <h3>🔍 Pistas del caso</h3>
       <div class="clue">
-        Tengo agujas, pero no sé coser.
-        Tengo números, pero no sé contar.
-        ¿Qué soy?
+        **Pista 1:** La vitrina no estaba rota.
+      </div>
+      <div class="clue">
+        **Pista 2:** Se encontró una etiqueta de decoración junto a la vitrina.
+      </div>
+      <div class="clue">
+        **Pista 3:** Una fotografía muestra que el trofeo fue movido antes de comenzar la feria.
       </div>
 
-      <div class="answers">
-        <button class="answer-button" data-answer="gato">🐱 Un gato</button>
-        <button class="answer-button" data-answer="reloj">🕒 Un reloj</button>
-        <button class="answer-button" data-answer="puerta">🚪 Una puerta</button>
+      <h3>🧩 Tablero compartido</h3>
+      <p>Añade ideas que ambos detectives podrán ver.</p>
+      <select id="board-kind">
+        <option value="pista">Pista</option>
+        <option value="teoria">Teoría</option>
+        <option value="duda">Duda</option>
+        <option value="conexion">Conexión</option>
+      </select>
+      <textarea id="board-content" maxlength="500" placeholder="Escribe una idea o descubrimiento..."></textarea>
+      <button class="main-button" id="add-board-button">Añadir al tablero</button>
+      <div id="board-list" class="shared-list"></div>
+
+      <h3>💬 Chat de detectives</h3>
+      <div id="chat-list" class="chat-list"></div>
+      <div class="chat-entry">
+        <input id="chat-input" maxlength="500" placeholder="Escribe un mensaje...">
+        <button id="send-button">Enviar</button>
       </div>
 
-      <div id="answer-message" class="message"></div>
-
-      <button class="second-button hidden" id="next-button">
-        Siguiente acertijo ➜
-      </button>
+      <h3>🏁 Conclusión del equipo</h3>
+      <p>Escriban a quién consideran responsable y expliquen sus pruebas.</p>
+      <input id="final-suspect" placeholder="¿Quién creen que movió el trofeo?">
+      <textarea id="final-reason" maxlength="500" placeholder="¿Cuál fue el motivo y qué pistas lo demuestran?"></textarea>
+      <button class="main-button" id="submit-conclusion">Enviar conclusión</button>
+      <p id="final-message" class="message"></p>
     </section>
 
-    <footer>
-      🏆 DOS DETECTIVES • UN MISTERIO • UNA VICTORIA
-    </footer>
-
+    <footer>🔎 DOS DETECTIVES • UN EQUIPO • UN MISTERIO</footer>
   </main>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
