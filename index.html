@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#123b35">
   <title>Treasure Island | Búsqueda del Tesoro</title>
+
   <link rel="stylesheet" href="style.css">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,17 +14,22 @@
 </head>
 
 <body>
+
   <header class="header">
     <div>
       <p class="eyebrow">AVENTURA MULTIJUGADOR</p>
       <h1>🏝️ Treasure Island</h1>
       <p class="subtitle">¡Encuentra los tesoros antes que tu rival!</p>
     </div>
-    <div id="connectionStatus" class="status">Preparando aventura...</div>
+
+    <div id="connectionStatus" class="status">
+      Preparando aventura...
+    </div>
   </header>
 
   <main class="container">
 
+    <!-- INGRESO A LA PARTIDA -->
     <section class="panel setup-panel">
       <h2>⚓ Tu expedición</h2>
 
@@ -42,6 +48,7 @@
       </p>
     </section>
 
+    <!-- ZONA PRINCIPAL DEL JUEGO -->
     <section class="game-layout">
 
       <div class="panel island-panel">
@@ -51,54 +58,74 @@
             <h2>🗺️ Mapa del tesoro</h2>
             <p>Explora la isla y encuentra los cofres.</p>
           </div>
+
           <span class="map-tag">ISLA 01</span>
         </div>
 
+        <!-- MAPA -->
         <div id="island" class="island" aria-label="Mapa de la isla">
 
+          <!-- DECORACIÓN -->
           <div class="island-decoration palm palm-one">🌴</div>
           <div class="island-decoration palm palm-two">🌴</div>
           <div class="island-decoration rock">🪨</div>
           <div class="island-decoration ship">⛵</div>
 
-          <!-- Obstáculos -->
+          <!-- OBSTÁCULOS -->
           <div id="obstacleArea">
             <span class="obstacle" style="left:25%;top:45%">🪨</span>
             <span class="obstacle" style="left:55%;top:55%">🌳</span>
             <span class="obstacle" style="left:82%;top:65%">🪨</span>
+            <span class="obstacle" style="left:40%;top:35%">🌴</span>
           </div>
 
-          <!-- Tesoros -->
-          <div id="treasureArea"></div>
+          <!-- TESOROS -->
+          <div id="treasureArea">
+            <span class="treasure" style="left:18%;top:25%">🧰</span>
+            <span class="treasure" style="left:48%;top:18%">🧰</span>
+            <span class="treasure" style="left:76%;top:30%">🧰</span>
+            <span class="treasure" style="left:35%;top:72%">🧰</span>
+            <span class="treasure" style="left:72%;top:76%">🧰</span>
+          </div>
 
-          <!-- Jugadores -->
-          <div id="pirateA" class="pirate pirate-red" title="Jugador rojo">🏴‍☠️</div>
-          <div id="pirateB" class="pirate pirate-blue" title="Jugador azul">🏴‍☠️</div>
+          <!-- JUGADORES -->
+          <div id="pirateA" class="pirate pirate-red" title="Jugador rojo">
+            🏴‍☠️
+          </div>
+
+          <div id="pirateB" class="pirate pirate-blue" title="Jugador azul">
+            🏴‍☠️
+          </div>
 
         </div>
 
         <p class="helper">
           Usa las flechas del teclado o los botones para moverte.
+          ¡Evita los obstáculos!
         </p>
 
-        <!-- Controles de movimiento -->
+        <!-- BOTONES DE MOVIMIENTO -->
         <div class="controls">
-          <button data-move="up" type="button" aria-label="Mover arriba">⬆️</button>
+
+          <button data-move="up" type="button">⬆️</button>
 
           <div>
-            <button data-move="left" type="button" aria-label="Mover izquierda">⬅️</button>
-            <button data-move="down" type="button" aria-label="Mover abajo">⬇️</button>
-            <button data-move="right" type="button" aria-label="Mover derecha">➡️</button>
+            <button data-move="left" type="button">⬅️</button>
+            <button data-move="down" type="button">⬇️</button>
+            <button data-move="right" type="button">➡️</button>
           </div>
 
           <button id="findTreasureButton" class="treasure-button" type="button">
             🔎 Buscar tesoro
           </button>
+
         </div>
 
-        <!-- Tiempo y opciones -->
+        <!-- TIEMPO -->
         <div class="game-options">
-          <h3>⏱️ Tiempo restante:
+
+          <h3>
+            ⏱️ Tiempo restante:
             <span id="timerDisplay">03:00</span>
           </h3>
 
@@ -109,6 +136,7 @@
           <button id="leaveButton" type="button">
             🚪 Abandonar partida
           </button>
+
         </div>
 
         <p id="gameMessage" class="message" role="status">
@@ -117,25 +145,30 @@
 
       </div>
 
-      <!-- Marcador -->
+      <!-- MARCADOR -->
       <aside class="panel scoreboard">
+
         <h2>🏆 Marcador</h2>
 
         <div class="score-card red-card">
           <div class="player-symbol">🏴‍☠️</div>
+
           <div>
             <h3 id="nameA">Pirata Rojo</h3>
             <p>Jugador 1</p>
           </div>
+
           <strong id="scoreA">0</strong>
         </div>
 
         <div class="score-card blue-card">
           <div class="player-symbol">🏴‍☠️</div>
+
           <div>
             <h3 id="nameB">Pirata Azul</h3>
             <p>Jugador 2</p>
           </div>
+
           <strong id="scoreB">0</strong>
         </div>
 
@@ -144,20 +177,26 @@
         <ul id="activityList" class="activity-list">
           <li>Los tesoros aparecerán aquí.</li>
         </ul>
+
       </aside>
 
     </section>
 
+    <!-- INSTRUCCIONES -->
     <section class="panel instructions">
+
       <h2>📖 Cómo jugar</h2>
+
       <ol>
         <li>Escribe tu nombre y entra a la isla.</li>
-        <li>Abre la misma dirección en otro navegador para probar con otro jugador.</li>
-        <li>Muévete con las flechas o los botones.</li>
-        <li>Evita los obstáculos.</li>
+        <li>Abre la misma dirección en otro navegador para jugar con otra persona.</li>
+        <li>Muévete usando las flechas o los botones.</li>
+        <li>Evita las rocas y los árboles.</li>
         <li>Acércate a un cofre y pulsa Buscar tesoro.</li>
-        <li>Encuentra tesoros antes de que termine el tiempo.</li>
+        <li>Consigue más puntos antes de que termine el tiempo.</li>
+        <li>Puedes reiniciar o abandonar la partida.</li>
       </ol>
+
     </section>
 
   </main>
