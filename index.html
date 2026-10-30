@@ -1,1 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detectives en Duelo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      color: #fff;
+      background: linear-gradient(145deg, #171b46, #35318a 55%, #662f83);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 22px;
+    }
+
+    .game {
+      width: 100%;
+      max-width: 780px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #ffcf55;
+      color: #29234f;
+      padding: 9px 17px;
+      border-radius: 30px;
+      font-weight: bold;
+      font-size: 13px;
+      letter-spacing: 1px;
+      transform: rotate(-2deg);
+    }
+
+    h1 {
+      margin: 20px 0 8px;
+      font-size: clamp(34px, 7vw, 60px);
+      line-height: 1.05;
+      text-shadow: 0 5px 0 #26245d;
+    }
+
+    h1 span {
+      color: #ffcf55;
+    }
+
+    .intro {
+      color: #e4e4ff;
+      font-size: 17px;
+      line-height: 1.5;
+      margin: 12px auto 24px;
+      max-width: 470px;
+    }
+
+    .detectives {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 25px;
+      margin: 25px 0;
+    }
+
+    .character {
+      width: 112px;
+      height: 112px;
+      border-radius: 30px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 67px;
+      border: 3px solid rgba(255,255,255,.65);
+      box-shadow: 0 8px 0 rgba(0,0,0,.18);
+      animation: float 2.5s ease-in-out infinite;
+    }
+
+    .one {
+      background: #ffbd59;
+      transform: rotate(-7deg);
+    }
+
+    .two {
+      background: #62d6d1;
+      transform: rotate(7deg);
+      animation-delay: .4s;
+    }
+
+    .versus {
+      color: #ffcf55;
+      font-size: 24px;
+      font-weight: 900;
+      font-style: italic;
+    }
+
+    @keyframes float {
+      0%, 100% { translate: 0 0; }
+      50% { translate: 0 -7px; }
+    }
+
+    .panel {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 25px;
+      padding: 25px;
+      max-width: 470px;
+      margin: 0 auto;
+      box-shadow: 0 15px 35px rgba(0,0,0,.15);
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 23px;
+    }
+
+    .panel p {
+      color: #e4e4ff;
+      margin: 0 0 20px;
+      font-size: 14px;
+    }
+
+    button, input {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: bold;
+      font-family: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      transition: transform .15s, filter .15s;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-2px);
+    }
+
+    .primary {
+      background: #ffcf55;
+      color: #29234f;
+      box-shadow: 0 5px 0 #d99b2b;
+      margin-bottom: 15px;
+    }
+
+    .secondary {
+      background: #fff;
+      color: #343078;
+    }
+
+    input {
+      background: #fff;
+      color: #29234f;
+      margin-bottom: 12px;
+      outline: 3px solid transparent;
+    }
+
+    input:focus {
+      outline-color: #ffcf55;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .message {
+      margin-top: 16px;
+      color: #ffdf82;
+      font-weight: bold;
+      line-height: 1.5;
+    }
+
+    .footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: #c7c7ef;
+    }
+
+    @media (max-width: 420px) {
+      .character {
+        width: 83px;
+        height: 83px;
+        font-size: 49px;
+        border-radius: 23px;
+      }
+
+      .detectives {
+        gap: 14px;
+      }
+
+      .panel {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <div class="badge">🕵️ JUEGO DE MISTERIO • 2 JUGADORES</div>
+
+    <h1>DETECTIVES<br><span>EN DUELO</span></h1>
+
+    <p class="intro">
+      Resuelve acertijos, descubre pistas y encuentra al culpable
+      antes que tu rival. ¡Que gane el mejor detective!
+    </p>
+
+    <div class="detectives" aria-label="Dos detectives rivales">
+      <div class="character one">🕵️</div>
+      <div class="versus">VS</div>
+      <div class="character two">🕵️‍♀️</div>
+    </div>
+
+    <section class="panel" id="menu">
+      <h2>🔎 ¡Comienza la investigación!</h2>
+      <p>Crea una sala o entra con el código de tu compañero.</p>
+
+      <button class="primary" onclick="showCreate()">
+        🎮 CREAR PARTIDA
+      </button>
+
+      <button class="secondary" onclick="showJoin()">
+        🔑 UNIRSE A UNA PARTIDA
+      </button>
+
+      <div class="message" id="menuMessage" role="status"></div>
+    </section>
+
+    <section class="panel hidden" id="createPanel">
+      <h2>🗝️ Nueva investigación</h2>
+      <p>¡Pronto podrás crear una sala para jugar con otra persona!</p>
+      <button class="primary" onclick="backToMenu()">VOLVER</button>
+      <div class="message">
+        Siguiente misión: conectar las salas compartidas.
+      </div>
+    </section>
+
+    <section class="panel hidden" id="joinPanel">
+      <h2>🔑 Entrar a una sala</h2>
+      <p>Cuando activemos las partidas en línea, podrás ingresar el código de tu rival.</p>
+      <input
+        id="roomCode"
+        type="text"
+        maxlength="8"
+        placeholder="Ejemplo: LUPA27"
+        autocomplete="off"
+        aria-label="Código de partida"
+      >
+      <button class="primary" onclick="tryJoin()">ENTRAR A LA PARTIDA</button>
+      <button class="secondary" onclick="backToMenu()">VOLVER</button>
+      <div class="message" id="joinMessage" role="status"></div>
+    </section>
+
+    <div class="footer">
+      🏆 DOS DETECTIVES • UN MISTERIO • ¡UNA SOLA VICTORIA!
+    </div>
+  </main>
+
+  <script>
+    const menu = document.getElementById("menu");
+    const createPanel = document.getElementById("createPanel");
+    const joinPanel = document.getElementById("joinPanel");
+
+    function hidePanels() {
+      menu.classList.add("hidden");
+      createPanel.classList.add("hidden");
+      joinPanel.classList.add("hidden");
+    }
+
+    function showCreate() {
+      hidePanels();
+      createPanel.classList.remove("hidden");
+    }
+
+    function showJoin() {
+      hidePanels();
+      joinPanel.classList.remove("hidden");
+      document.getElementById("joinMessage").textContent = "";
+    }
+
+    function backToMenu() {
+      hidePanels();
+      menu.classList.remove("hidden");
+    }
+
+    function tryJoin() {
+      const code = document.getElementById("roomCode").value.trim();
+
+      if (!code) {
+        document.getElementById("joinMessage").textContent =
+          "🔎 Escribe el código de la sala.";
+        return;
+      }
+
+      document.getElementById("joinMessage").textContent =
+        "🚧 Todavía estamos preparando las partidas en línea. ¡Esa será nuestra próxima misión!";
+    }
+  </script>
+</body>
+</html>
