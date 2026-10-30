@@ -165,10 +165,6 @@ button:disabled {
   font-size: 14px;
 }
 
-.ready-card span {
-  font-weight: bold;
-}
-
 .red-card {
   background: #673b3b;
 }
@@ -234,7 +230,7 @@ button:disabled {
   font-weight: bold;
 }
 
-/* CÁMARA: VENTANA VISIBLE */
+/* CÁMARA */
 
 .island {
   position: relative;
@@ -247,13 +243,13 @@ button:disabled {
   box-shadow: inset 0 0 30px #183d20;
 }
 
-/* MUNDO HORIZONTAL */
+/* MUNDO */
 
 .game-world {
   position: absolute;
   top: 0;
   left: 0;
-  width: 2600px;
+  width: 4200px;
   height: 100%;
   overflow: hidden;
   transform: translateX(0);
@@ -267,7 +263,7 @@ button:disabled {
   );
 }
 
-/* FONDO DE LA SELVA */
+/* FONDO */
 
 .world-background {
   position: absolute;
@@ -288,31 +284,11 @@ button:disabled {
   user-select: none;
 }
 
-.decoration-one {
-  left: 120px;
-  top: 170px;
-}
-
-.decoration-two {
-  left: 580px;
-  top: 135px;
-}
-
-.decoration-three {
-  left: 980px;
-  top: 165px;
-}
-
-.decoration-four {
-  left: 1450px;
-  top: 145px;
-}
-
-.decoration-five {
-  left: 1900px;
-  top: 165px;
-}
-
+.decoration-one { left: 120px; top: 170px; }
+.decoration-two { left: 580px; top: 135px; }
+.decoration-three { left: 980px; top: 165px; }
+.decoration-four { left: 1450px; top: 145px; }
+.decoration-five { left: 1900px; top: 165px; }
 .decoration-six {
   left: 1150px;
   top: 60px;
@@ -325,7 +301,7 @@ button:disabled {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 2600px;
+  width: 4200px;
   height: 82px;
   z-index: 3;
   background:
@@ -390,9 +366,26 @@ button:disabled {
 .obstacle {
   position: absolute;
   display: block;
-  font-size: 38px;
+  width: 64px;
+  height: 64px;
+  max-width: none;
+  object-fit: contain;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
   transform: translate(-50%, -50%);
   z-index: 5;
+  overflow: visible;
+  image-rendering: auto;
+}
+
+.obstacle img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+  object-position: center;
 }
 
 .treasure {
@@ -407,7 +400,7 @@ button:disabled {
 
 .finish-line {
   position: absolute;
-  left: 2470px;
+  left: 4050px;
   bottom: 82px;
   z-index: 5;
   padding: 12px 8px;
@@ -588,64 +581,8 @@ footer {
   font-size: 12px;
 }
 
-/* MÓVILES */
+/* ELEMENTOS ADICIONALES */
 
-@media (max-width: 760px) {
-  .setup-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .game-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .header {
-    padding: 25px 5%;
-  }
-
-  .island {
-    height: 340px;
-  }
-
-  .panel {
-    padding: 17px;
-  }
-
-  .world-decoration {
-    font-size: 48px;
-  }
-
-  .pirate {
-    width: 42px;
-    height: 46px;
-    font-size: 29px;
-  }
-}
-
-@media (max-width: 600px) {
-  .ready-players {
-    grid-template-columns: 1fr;
-  }
-
-  .controls {
-    justify-content: center;
-  }
-
-  .game-options button {
-    flex: 1;
-  }
-}
-/* Mundo más largo */
-.game-world {
-  width: 4200px;
-}
-
-/* Línea de llegada */
-.finish-line {
-  left: 4050px;
-}
-
-/* Área de plataformas */
 .platform-area {
   position: absolute;
   inset: 0;
@@ -653,7 +590,6 @@ footer {
   z-index: 3;
 }
 
-/* Superficies para saltar */
 .game-platform {
   position: absolute;
   height: 18px;
@@ -663,7 +599,6 @@ footer {
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
 }
 
-/* Pantalla de victoria */
 .winner-overlay {
   position: fixed;
   inset: 0;
@@ -711,4 +646,52 @@ footer {
   font-size: 17px;
   font-weight: bold;
   cursor: pointer;
+}
+
+/* MÓVILES */
+
+@media (max-width: 760px) {
+  .setup-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    padding: 25px 5%;
+  }
+
+  .island {
+    height: 340px;
+  }
+
+  .panel {
+    padding: 17px;
+  }
+
+  .world-decoration {
+    font-size: 48px;
+  }
+
+  .pirate {
+    width: 42px;
+    height: 46px;
+    font-size: 29px;
+  }
+}
+
+@media (max-width: 600px) {
+  .ready-players {
+    grid-template-columns: 1fr;
+  }
+
+  .controls {
+    justify-content: center;
+  }
+
+  .game-options button {
+    flex: 1;
+  }
 }
