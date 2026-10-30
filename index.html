@@ -5,34 +5,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#123b35">
-  <title>Treasure Island | Carrera del Tesoro</title>
-
+  <title>Treasure Island | Aventura Pirata</title>
   <link rel="stylesheet" href="style.css">
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="game.js" defer></script>
 </head>
 
 <body>
-
   <header class="header">
     <div>
       <p class="eyebrow">AVENTURA MULTIJUGADOR</p>
       <h1>🏝️ Treasure Island</h1>
-      <p class="subtitle">¡Compite, recoge tesoros y llega a la meta!</p>
+      <p class="subtitle">¡Explora la selva y encuentra el gran tesoro!</p>
     </div>
-
-    <div id="connectionStatus" class="status">
-      Preparando aventura...
-    </div>
+    <div id="connectionStatus" class="status">Preparando aventura...</div>
   </header>
 
   <main class="container">
 
-    <!-- INGRESO A LA PARTIDA -->
     <section class="panel setup-panel">
       <h2>⚓ Tu expedición</h2>
-
       <label for="playerName">Nombre del pirata</label>
       <input id="playerName" maxlength="20" placeholder="Ej. Capitán Ana">
 
@@ -42,211 +34,163 @@
       <button id="joinButton" class="primary-button" type="button">
         Entrar a la isla
       </button>
-
-      <p id="playerInfo" class="helper">
-        Elige un nombre y entra a jugar.
-      </p>
+      <p id="playerInfo" class="helper">Elige un nombre y entra a jugar.</p>
     </section>
 
-    <!-- SALA DE ESPERA -->
     <section id="waitingRoom" class="panel waiting-room">
       <h2>⚓ Sala de espera</h2>
-      <p>Los dos capitanes deben estar listos para comenzar la carrera.</p>
+      <p>Los dos capitanes deben estar listos para comenzar.</p>
 
       <div class="ready-players">
-
         <div class="ready-card red-card">
           <span>🏴‍☠️ Capitán Rojo</span>
           <strong id="readyA">Esperando...</strong>
         </div>
-
         <div class="ready-card blue-card">
           <span>🏴‍☠️ Capitán Azul</span>
           <strong id="readyB">Esperando...</strong>
         </div>
-
       </div>
 
       <button id="readyButton" class="primary-button" type="button" disabled>
         ¡Estoy listo!
       </button>
-
-      <p id="readyMessage" class="helper">
-        Entra a la isla para prepararte.
-      </p>
-
-      <div id="countdownDisplay" class="countdown" hidden>
-        5
-      </div>
+      <p id="readyMessage" class="helper">Entra a la isla para prepararte.</p>
+      <div id="countdownDisplay" class="countdown" hidden>5</div>
     </section>
 
-    <!-- ZONA PRINCIPAL DEL JUEGO -->
     <section class="game-layout">
-
       <div class="panel island-panel">
 
         <div class="section-heading">
           <div>
-            <h2>🗺️ Mapa del tesoro</h2>
-            <p>Recoge cofres y corre hacia la meta.</p>
+            <h2>🗺️ Aventura en la selva</h2>
+            <p>Avanza, explora y recoge los tesoros.</p>
           </div>
-
           <span class="map-tag">ISLA 01</span>
         </div>
 
-        <!-- MAPA -->
-        <div id="island" class="island" aria-label="Mapa de la isla">
+        <!-- VENTANA DE LA CÁMARA -->
+        <div id="island" class="island" aria-label="Aventura de la isla">
 
-          <!-- DECORACIÓN -->
-          <div class="island-decoration palm palm-one">🌴</div>
-          <div class="island-decoration palm palm-two">🌴</div>
-          <div class="island-decoration rock">🪨</div>
-          <div class="island-decoration ship">⛵</div>
+          <!-- MUNDO QUE SE DESPLAZA -->
+          <div id="world" class="game-world">
 
-          <!-- OBSTÁCULOS -->
-          <div id="obstacleArea">
-            <span class="obstacle" style="left:25%;top:45%">🪨</span>
-            <span class="obstacle" style="left:55%;top:55%">🌳</span>
-            <span class="obstacle" style="left:82%;top:65%">🪨</span>
-            <span class="obstacle" style="left:40%;top:35%">🌴</span>
+            <div class="world-background"></div>
+
+            <div class="world-decoration decoration-one">🌴</div>
+            <div class="world-decoration decoration-two">🌴</div>
+            <div class="world-decoration decoration-three">🌳</div>
+            <div class="world-decoration decoration-four">⛰️</div>
+            <div class="world-decoration decoration-five">🌴</div>
+            <div class="world-decoration decoration-six">🦜</div>
+
+            <!-- SUELO Y PLATAFORMAS -->
+            <div class="ground"></div>
+            <div class="platform platform-one"></div>
+            <div class="platform platform-two"></div>
+            <div class="platform platform-three"></div>
+
+            <!-- OBSTÁCULOS -->
+            <div id="obstacleArea"></div>
+
+            <!-- TESOROS -->
+            <div id="treasureArea"></div>
+
+            <!-- META -->
+            <div id="finishLine" class="finish-line">
+              🏁 META
+            </div>
+
+            <!-- CAPITANES -->
+            <div id="pirateA" class="pirate pirate-red" title="Capitán rojo">
+              🏴‍☠️
+            </div>
+
+            <div id="pirateB" class="pirate pirate-blue" title="Capitán azul">
+              🏴‍☠️
+            </div>
+
           </div>
-
-          <!-- TESOROS -->
-          <div id="treasureArea">
-            <span class="treasure" style="left:18%;top:25%">🧰</span>
-            <span class="treasure" style="left:48%;top:18%">🧰</span>
-            <span class="treasure" style="left:76%;top:30%">🧰</span>
-            <span class="treasure" style="left:35%;top:72%">🧰</span>
-            <span class="treasure" style="left:72%;top:76%">🧰</span>
-          </div>
-
-          <!-- META -->
-          <div id="finishLine" class="finish-line">
-            🏁 META
-          </div>
-
-          <!-- JUGADORES -->
-          <div id="pirateA" class="pirate pirate-red" title="Jugador rojo">
-            🏴‍☠️
-          </div>
-
-          <div id="pirateB" class="pirate pirate-blue" title="Jugador azul">
-            🏴‍☠️
-          </div>
-
         </div>
 
         <p class="helper">
-          Usa las flechas del teclado o los botones para moverte.
-          ¡Evita los obstáculos!
+          Usa las flechas o WASD para explorar la selva.
+          La cámara seguirá a tu capitán.
         </p>
 
-        <!-- BOTONES DE MOVIMIENTO -->
         <div class="controls">
-
           <button data-move="up" type="button">⬆️</button>
-
           <div>
             <button data-move="left" type="button">⬅️</button>
             <button data-move="down" type="button">⬇️</button>
             <button data-move="right" type="button">➡️</button>
           </div>
-
           <button id="findTreasureButton" class="treasure-button" type="button">
             🔎 Buscar tesoro
           </button>
-
         </div>
 
-        <!-- TIEMPO -->
         <div class="game-options">
-
-          <h3>
-            ⏱️ Tiempo restante:
-            <span id="timerDisplay">06:00</span>
-          </h3>
-
-          <button id="restartButton" type="button">
-            🔄 Reiniciar partida
-          </button>
-
-          <button id="leaveButton" type="button">
-            🚪 Abandonar partida
-          </button>
-
+          <h3>⏱️ Tiempo restante: <span id="timerDisplay">06:00</span></h3>
+          <button id="restartButton" type="button">🔄 Reiniciar partida</button>
+          <button id="leaveButton" type="button">🚪 Abandonar partida</button>
         </div>
 
         <p id="gameMessage" class="message" role="status">
           ¡Bienvenido a la isla!
         </p>
-
       </div>
 
-      <!-- MARCADOR -->
       <aside class="panel scoreboard">
-
         <h2>🏆 Marcador</h2>
 
         <div class="score-card red-card">
           <div class="player-symbol">🏴‍☠️</div>
-
           <div>
             <h3 id="nameA">Pirata Rojo</h3>
             <p>Jugador 1</p>
           </div>
-
           <strong id="scoreA">0</strong>
         </div>
 
         <div class="score-card blue-card">
           <div class="player-symbol">🏴‍☠️</div>
-
           <div>
             <h3 id="nameB">Pirata Azul</h3>
             <p>Jugador 2</p>
           </div>
-
           <strong id="scoreB">0</strong>
         </div>
 
         <h3 class="activity-title">📜 Últimos hallazgos</h3>
-
         <ul id="activityList" class="activity-list">
           <li>Los tesoros aparecerán aquí.</li>
         </ul>
 
-        <!-- RESULTADO FINAL -->
         <div id="finalResult" class="final-result" hidden>
           <h2>🏆 Resultado final</h2>
           <p id="winnerMessage"></p>
         </div>
-
       </aside>
-
     </section>
 
-    <!-- INSTRUCCIONES -->
     <section class="panel instructions">
-
       <h2>📖 Cómo jugar</h2>
-
       <ol>
         <li>Escribe tu nombre y entra a la isla.</li>
-        <li>Comparte el código de la isla con el otro jugador.</li>
-        <li>Los dos capitanes deben pulsar ¡Estoy listo!</li>
-        <li>Cuando ambos estén preparados, comienza la cuenta regresiva.</li>
-        <li>Recoge cofres, evita obstáculos y llega a la meta.</li>
-        <li>La carrera dura seis minutos.</li>
-        <li>Al finalizar, gana quien haya conseguido más tesoros.</li>
+        <li>Comparte el código con el otro jugador.</li>
+        <li>Los dos capitanes deben marcar que están listos.</li>
+        <li>Explora la selva con las flechas o WASD.</li>
+        <li>La cámara seguirá a tu capitán.</li>
+        <li>Encuentra cofres y llega a la meta.</li>
+        <li>Al finalizar, gana quien consiga más tesoros.</li>
       </ol>
-
     </section>
-
   </main>
 
   <footer>
     Treasure Island · Laboratorio 4 · Proyecto educativo
   </footer>
-
 </body>
 </html>
