@@ -1,11 +1,4 @@
 
-:root {
-  --green: #176b58;
-  --dark: #16483f;
-  --yellow: #ffd45b;
-  --cream: #fff9e9;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -14,279 +7,248 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: "Nunito", sans-serif;
-  color: var(--dark);
-  background:
-    radial-gradient(circle at 10% 15%, #ffffffa0 0 4%, transparent 4.5%),
-    linear-gradient(180deg, #63cfe2 0%, #b8edcf 55%, #f9d994 100%);
-  overflow-x: hidden;
+  color: #174b40;
+  background: linear-gradient(180deg, #62cde4, #b9edce 58%, #f9d991);
 }
 
-.top {
+.header {
   text-align: center;
-  padding: 28px 12px 15px;
+  padding: 25px 10px 15px;
 }
 
 .logo {
   display: inline-block;
-  padding: 12px 25px;
-  border: 4px solid #ffe49a;
+  padding: 12px 24px;
+  border: 4px solid #ffe59b;
   border-radius: 20px;
   background: #70472b;
   color: white;
-  font-size: clamp(22px, 4vw, 38px);
+  font-size: clamp(21px, 4vw, 37px);
   font-weight: 900;
   text-shadow: 2px 3px #382719;
   box-shadow: 0 7px 0 #4d3424;
 }
 
 .logo span {
-  color: #ffda62;
+  color: #ffdc68;
 }
 
-.top p {
+.header p {
   font-weight: 900;
-  color: #205d50;
-  font-size: 16px;
-}
-
-.decor {
-  position: fixed;
-  z-index: -1;
-  font-size: 100px;
-  opacity: .55;
-  pointer-events: none;
-}
-
-.decor-one {
-  left: -15px;
-  bottom: 5px;
-}
-
-.decor-two {
-  right: 5%;
-  top: 12%;
 }
 
 main {
-  width: min(1050px, calc(100% - 24px));
+  width: min(1050px, calc(100% - 22px));
   margin: 15px auto 30px;
 }
 
 .panel {
   padding: 25px;
   border: 5px solid white;
-  border-radius: 28px;
-  background: #fff9e9ee;
-  box-shadow: 0 10px 0 #70b7a0;
+  border-radius: 27px;
+  background: #fff9e9ed;
+  box-shadow: 0 9px 0 #70b7a0;
+  text-align: center;
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: left;
-  margin-bottom: 18px;
-}
-
-.section-title > span {
-  font-size: 42px;
-}
-
-h1, h2, p {
-  margin-top: 0;
-}
-
-.section-title h1 {
-  margin-bottom: 2px;
-  font-size: clamp(23px, 4vw, 32px);
-}
-
-.section-title p {
-  margin: 0;
-  color: #63847a;
-  font-weight: 700;
+h1 {
+  font-size: clamp(24px, 4vw, 34px);
+  margin: 5px 0;
 }
 
 label {
   display: block;
-  margin: 15px 0 7px;
+  margin: 16px 0 7px;
+  text-align: left;
   font-weight: 900;
 }
 
 input {
   width: 100%;
-  padding: 13px 15px;
+  padding: 13px;
   border: 3px solid #c7e6d4;
   border-radius: 13px;
-  background: white;
-  color: var(--dark);
   font: inherit;
   outline: none;
 }
 
 input:focus {
   border-color: #36a78b;
-  box-shadow: 0 0 0 3px #36a78b22;
 }
 
-.character-grid {
+.characters {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 13px;
-  margin: 16px 0 20px;
+  gap: 12px;
+  margin: 15px 0;
 }
 
-.character-card {
-  min-width: 0;
-  padding: 13px 7px;
+.character {
+  padding: 12px 5px;
   border: 3px solid #e0e8d9;
-  border-radius: 19px;
+  border-radius: 18px;
   background: white;
-  color: var(--dark);
-  font-family: inherit;
+  color: #174b40;
+  font: inherit;
   cursor: pointer;
   box-shadow: 0 5px 0 #d4e0d2;
-  transition: .2s;
 }
 
-.character-card:hover {
-  transform: translateY(-4px);
-}
-
-.character-card.selected {
+.character.selected {
   border-color: #f5b82e;
-  background: #fff5ce;
-  box-shadow: 0 5px 0 #e3ae38;
+  background: #fff4c9;
   transform: translateY(-3px);
 }
 
-.avatar {
-  display: grid;
-  place-items: center;
-  width: 90px;
-  height: 90px;
-  max-width: 100%;
-  margin: 0 auto 9px;
-  border: 4px solid white;
-  border-radius: 28px;
-  font-size: 48px;
-  box-shadow: 0 4px 10px #183d3d22;
-}
-
-.nico { background: linear-gradient(140deg, #70d7ed, #2878c6); }
-.luna { background: linear-gradient(140deg, #d8b5ff, #7652c8); }
-.coco { background: linear-gradient(140deg, #ffb58a, #d85b4b); }
-.chispa { background: linear-gradient(140deg, #ffe77d, #ff9e34); }
-
-.character-card strong,
-.character-card small,
-.character-card span {
+.character span,
+.character b,
+.character small {
   display: block;
 }
 
-.character-card strong {
-  font-size: 15px;
-  font-weight: 900;
+.character span {
+  font-size: 43px;
+  margin-bottom: 6px;
 }
 
-.character-card small {
+.character small {
   color: #71877e;
   font-weight: 700;
-  margin: 3px 0;
 }
 
-.character-card span {
-  font-size: 19px;
-}
-
-.actions {
+.buttons, .game-buttons {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 13px;
+  gap: 12px;
   margin: 20px 0 8px;
 }
 
-button.main-btn,
-button.join-btn,
-.leave-btn {
-  padding: 13px 22px;
+button.primary, button.secondary {
+  padding: 12px 20px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 13px;
   font: inherit;
   font-weight: 900;
   cursor: pointer;
   transition: .2s;
 }
 
-.main-btn {
-  background: var(--yellow);
+button.primary {
+  background: #ffd45b;
   color: #664719;
   box-shadow: 0 5px 0 #d69b29;
 }
 
-.join-btn {
+button.secondary {
   background: #3da98a;
   color: white;
   box-shadow: 0 5px 0 #24745e;
 }
 
-button.main-btn:hover,
-button.join-btn:hover,
-.leave-btn:hover {
-  transform: translateY(-3px);
+button:hover {
+  filter: brightness(1.04);
+  transform: translateY(-2px);
 }
 
 #status {
-  min-height: 22px;
-  text-align: center;
+  min-height: 24px;
   font-weight: 800;
-  color: #49786b;
 }
 
 .hidden {
   display: none !important;
 }
 
-.game-heading {
+.map-heading, .game-top {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.game-heading h2 {
-  margin: 0;
-  font-size: 25px;
-}
-
-.game-heading p {
+.map-heading p, .game-top p {
   margin: 0;
   font-weight: 800;
 }
 
-.stats {
+.map-stats, .hud {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.stats span {
-  padding: 8px 12px;
+.map-stats span, .hud span {
+  padding: 9px 12px;
+  border: 2px solid #d3ebd8;
   border-radius: 12px;
   background: white;
-  border: 2px solid #d3ebd8;
   font-weight: 900;
+}
+
+.island-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin: 25px 0;
+}
+
+.island-card {
+  min-width: 0;
+  padding: 16px 7px;
+  border: 3px solid #e1e9d9;
+  border-radius: 18px;
+  background: white;
+  color: #174b40;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #d4e0d2;
+}
+
+.island-card span {
+  display: block;
+  font-size: 43px;
+  margin-bottom: 8px;
+}
+
+.island-card b, .island-card small {
+  display: block;
+}
+
+.island-card small {
+  margin-top: 5px;
+  color: #72857b;
+  font-weight: 700;
+}
+
+.island-card.unlocked {
+  border-color: #75c58b;
+}
+
+.island-card.locked {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.message {
+  min-height: 27px;
+  color: #176b58;
+  font-size: 17px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.game-top h2 {
+  margin: 0;
 }
 
 .canvas-frame {
   overflow: hidden;
   border: 6px solid white;
-  border-radius: 22px;
-  background: #65cfe1;
+  border-radius: 20px;
+  background: #67cde2;
   box-shadow: 0 8px 0 #348c76;
 }
 
@@ -296,61 +258,54 @@ canvas {
   height: auto;
 }
 
+.quest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 10px;
+  padding: 13px;
+  border: 2px solid #f2d47c;
+  border-radius: 13px;
+  background: #fff4ce;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
-  margin: 15px 0;
+  gap: 8px;
+  margin: 12px 0;
 }
 
-.controls div {
+.controls span {
   padding: 9px 12px;
-  border-radius: 12px;
+  border-radius: 11px;
   background: white;
+  font-weight: 800;
   font-size: 14px;
 }
 
-.message {
-  min-height: 28px;
-  text-align: center;
-  font-size: 18px;
-  font-weight: 900;
-  color: #176b58;
-}
-
-.leave-btn {
-  display: block;
-  margin: 10px auto;
-  background: #f4e2d5;
-  color: #8a5140;
-  box-shadow: 0 4px 0 #d7b7a7;
-}
-
 footer {
-  padding: 15px;
   text-align: center;
-  color: #356b5e;
+  padding: 15px;
   font-weight: 900;
 }
 
-@media (max-width: 650px) {
-  .character-grid {
+@media(max-width: 700px) {
+  .characters {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .island-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .map-heading, .game-top {
+    justify-content: center;
+    text-align: center;
   }
 
   .panel {
     padding: 16px;
-  }
-
-  .avatar {
-    width: 75px;
-    height: 75px;
-    font-size: 40px;
-  }
-
-  .game-heading {
-    justify-content: center;
-    text-align: center;
   }
 }
