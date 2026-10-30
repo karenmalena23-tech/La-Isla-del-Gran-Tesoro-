@@ -1,25 +1,30 @@
 
-/* ==========================================
+/* ==================================================
    LA ISLA DEL GRAN TESORO
-   Juego multijugador con plataformas y saltos
-   ========================================== */
+   Carrera automática multijugador
+   Saltos, plataformas, Supabase y ganador automático
+   ================================================== */
 
-const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
+// ---------------- SUPABASE ----------------
+
+const SUPABASE_URL =
+  "https://byvfpocakysizleuzypp.supabase.co";
+
+const SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
 
-// ==========================================
-// CONFIGURACIÓN
-// ==========================================
+const $ = id => document.getElementById(id);
 
-const GAME_DURATION = 360; // 6 minutos de juego
-const COUNTDOWN_DURATION = 5;
+// ---------------- CONFIGURACIÓN ----------------
 
+const GAME_DURATION = 360;
 const WORLD_WIDTH = 4200;
+
 const PLAYER_START_X = 140;
 const PLAYER_START_Y = 314;
 const FINISH_X = 4050;
@@ -29,7 +34,12 @@ const PLAYER_HALF_HEIGHT = 24;
 
 const GRAVITY = 0.65;
 const JUMP_FORCE = -13;
-const MOVE_X = 45;
+
+// Velocidad automática: aproximadamente 13 píxeles por segundo.
+const AUTO_RUN_SPEED = 0.22;
+
+// Guardar posiciones en Supabase cada 200 ms.
+const SAVE_INTERVAL = 200;
 
 const TREASURES = [
   { id: 1, x: 350, y: 300 },
@@ -64,11 +74,7 @@ const PLATFORMS = [
   { x: 3700, top: 220, width: 190 }
 ];
 
-// ==========================================
-// VARIABLES DEL JUEGO
-// ==========================================
-
-const $ = id => document.getElementById(id);
+// ---------------- ESTADO ----------------
 
 let currentPlayer = null;
 let roomPlayers = [];
@@ -80,21 +86,21 @@ let roomStatus = "waiting";
 let startedAt = null;
 
 let channel = null;
-let busy = false;
 
-let timerInterval = null;
-let physicsInterval = null;
+let busy = false;
+let loadingRoom = false;
+let savingPosition = false;
 
 let verticalVelocity = 0;
 let isGrounded = true;
-let physicsSaveBusy = false;
-let lastPhysicsSave = 0;
 
-let loadingRoom = false;
+let lastFrameTime = 0;
+let lastSaveTime = 0;
 
-// ==========================================
-// MENSAJES Y ESTADO
-// ==========================================
+let gameLoop = null;
+let timerInterval = null;
+
+// ---------------- MENSAJES ----------------
 
 function setMessage(message) {
   if ($("gameMessage")) {
@@ -118,25 +124,29 @@ function getPlayer(role) {
   return roomPlayers.find(player => player.role === role);
 }
 
-// ==========================================
-// PREPARAR EL MUNDO
-// ==========================================
+// ---------------- PREPARAR ESCENARIO ----------------
 
 function prepareWorld() {
   const world = $("world");
 
   if (!world) {
-    console.error("No se encontró el elemento #world.");
+    console.error("No se encontró #world.");
     return;
   }
 
   world.style.width = WORLD_WIDTH + "px";
 
   const ground = world.querySelector(".ground");
-  if (ground) ground.style.width = WORLD_WIDTH + "px";
+
+  if (ground) {
+    ground.style.width = WORLD_WIDTH + "px";
+  }
 
   const finish = $("finishLine");
-  if (finish) finish.style.left = FINISH_X + "px";
+
+  if (finish) {
+    finish.style.left = FINISH_X + "px";
+  }
 
   if (!$("platformArea")) {
     const area = document.createElement("div");
@@ -146,9 +156,7 @@ function prepareWorld() {
   }
 }
 
-// ==========================================
-// CÁMARA INDIVIDUAL
-// ==========================================
+// ---------------- CÁMARA ----------------
 
 function updateCamera() {
   if (!currentPlayer) return;
@@ -172,22 +180,11 @@ function updateCamera() {
     `translate3d(${-cameraX}px, 0, 0)`;
 }
 
-// ==========================================
-// TIEMPO DE JUEGO
-// ==========================================
+// ---------------- TEMPORIZADOR ----------------
 
 function remainingTime() {
   if (!startedAt || roomStatus === "waiting") {
     return GAME_DURATION;
-  }
-
-  const start = new Date(startedAt).getTime();
-
-  if (roomStatus === "countdown") {
-    return Math.max(
-      0,
-      Math.ceil((start - Date.now()) / 1000)
-    );
   }
 
   if (roomStatus === "finished") {
@@ -195,7 +192,7 @@ function remainingTime() {
   }
 
   const elapsed = Math.floor(
-    (Date.now() - start) / 1000
+    (Date.now() - new Date(startedAt).getTime()) / 1000
   );
 
   return Math.max(0, GAME_DURATION - elapsed);
@@ -214,17 +211,16 @@ function updateTimer() {
   }
 
   if (roomStatus === "countdown") {
-    const seconds = remainingTime();
+    const seconds = Math.max(
+      0,
+      Math.ceil(
+        (new Date(startedAt).getTime() - Date.now()) / 1000
+      )
+    );
 
     countdown.hidden = false;
     countdown.textContent = seconds;
     timer.textContent = "06:00";
-
-    if (seconds <= 0) {
-      countdown.hidden = true;
-      advanceRoomState();
-    }
-
     return;
   }
 
@@ -242,7 +238,7 @@ function updateTimer() {
     ":" +
     String(remaining % 60).padStart(2, "0");
 
-  if (remaining <= 0 && roomStatus === "racing") {
+  if (remaining <= 0) {
     finishByTimeout();
   }
 }
@@ -254,9 +250,7 @@ function startTimer() {
   timerInterval = setInterval(updateTimer, 1000);
 }
 
-// ==========================================
-// CARGAR SALA
-// ==========================================
+// ---------------- CARGAR SALA ----------------
 
 async function ensureRoom() {
   const { data, error } = await supabaseClient
@@ -316,12 +310,12 @@ async function loadRoom() {
     roomData = roomResult.data;
 
     if (currentPlayer) {
-      const updatedPlayer = roomPlayers.find(
+      const updated = roomPlayers.find(
         player => player.id === currentPlayer.id
       );
 
-      if (updatedPlayer) {
-        currentPlayer = updatedPlayer;
+      if (updated) {
+        currentPlayer = updated;
       }
     }
 
@@ -336,18 +330,16 @@ async function loadRoom() {
     if (roomStatus === "countdown") {
       await advanceRoomState();
     }
+
   } finally {
     loadingRoom = false;
   }
 }
 
-// ==========================================
-// COMENZAR CARRERA
-// ==========================================
+// ---------------- INICIAR CARRERA ----------------
 
 async function advanceRoomState() {
   if (
-    !roomCode ||
     roomStatus !== "countdown" ||
     !startedAt ||
     Date.now() < new Date(startedAt).getTime()
@@ -355,39 +347,51 @@ async function advanceRoomState() {
     return;
   }
 
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from("treasure_rooms")
-    .update({ status: "racing" })
+    .update({
+      status: "racing",
+      started_at: new Date().toISOString()
+    })
     .eq("room_code", roomCode)
-    .eq("status", "countdown");
+    .eq("status", "countdown")
+    .select()
+    .maybeSingle();
 
   if (error) {
     console.error(error);
     return;
   }
 
-  roomStatus = "racing";
+  if (data) {
+    roomData = data;
+    roomStatus = "racing";
+    startedAt = data.started_at;
+  }
+
+  lastFrameTime = 0;
+  lastSaveTime = 0;
 
   render();
   updateTimer();
 
-  setMessage("¡La carrera comenzó! ¡Corre hacia la meta!");
+  setMessage("¡La carrera comenzó! ¡Salta los obstáculos!");
 }
 
-// ==========================================
-// DIBUJAR TODO
-// ==========================================
+// ---------------- DIBUJAR JUEGO ----------------
 
 function render() {
   const red = getPlayer("red");
   const blue = getPlayer("blue");
 
   if ($("nameA")) {
-    $("nameA").textContent = red?.player_name || "Pirata Rojo";
+    $("nameA").textContent =
+      red?.player_name || "Pirata Rojo";
   }
 
   if ($("nameB")) {
-    $("nameB").textContent = blue?.player_name || "Pirata Azul";
+    $("nameB").textContent =
+      blue?.player_name || "Pirata Azul";
   }
 
   if ($("scoreA")) $("scoreA").textContent = red?.score ?? 0;
@@ -409,6 +413,7 @@ function render() {
 
 function drawPirate(elementId, player) {
   const pirate = $(elementId);
+
   if (!pirate) return;
 
   if (!player) {
@@ -487,9 +492,7 @@ function renderActivity() {
   });
 }
 
-// ==========================================
-// SALA DE ESPERA
-// ==========================================
+// ---------------- SALA DE ESPERA ----------------
 
 function renderWaitingRoom() {
   const red = getPlayer("red");
@@ -505,15 +508,13 @@ function renderWaitingRoom() {
       blue?.is_ready ? "✓ ¡Listo!" : "Esperando...";
   }
 
-  const readyButton = $("readyButton");
-
-  if (readyButton) {
-    readyButton.disabled =
+  if ($("readyButton")) {
+    $("readyButton").disabled =
       !currentPlayer ||
       Boolean(currentPlayer?.is_ready) ||
       roomStatus !== "waiting";
 
-    readyButton.textContent =
+    $("readyButton").textContent =
       currentPlayer?.is_ready
         ? "✓ Ya estás listo"
         : "¡Estoy listo!";
@@ -524,13 +525,13 @@ function renderWaitingRoom() {
       $("readyMessage").textContent =
         !red || !blue
           ? "Esperando a los dos capitanes."
-          : "Cuando ambos estén listos, comenzará la aventura.";
+          : "Cuando ambos estén listos, comenzará la carrera.";
     } else if (roomStatus === "countdown") {
       $("readyMessage").textContent = "¡Prepárense!";
     } else if (roomStatus === "racing") {
       $("readyMessage").textContent = "¡La carrera está en marcha!";
     } else {
-      $("readyMessage").textContent = "La carrera ha terminado.";
+      $("readyMessage").textContent = "La carrera terminó.";
     }
   }
 }
@@ -540,7 +541,7 @@ async function markReady() {
 
   busy = true;
 
-  if ($("readyButton")) $("readyButton").disabled = true;
+  $("readyButton").disabled = true;
 
   try {
     const { error } = await supabaseClient.rpc(
@@ -555,19 +556,19 @@ async function markReady() {
     if (error) throw error;
 
     await loadRoom();
+
     setMessage("¡Estás listo! Esperando al otro capitán.");
+
   } catch (error) {
     console.error(error);
-    setMessage("No se pudo marcar como listo: " + error.message);
+    setMessage("Error: " + error.message);
   } finally {
     busy = false;
     renderWaitingRoom();
   }
 }
 
-// ==========================================
-// UNIRSE A LA SALA
-// ==========================================
+// ---------------- UNIRSE ----------------
 
 async function joinIsland() {
   if (busy) return;
@@ -581,12 +582,13 @@ async function joinIsland() {
     .slice(0, 30);
 
   if (!playerName || !roomCode) {
-    setMessage("Escribe tu nombre y el código de la isla.");
+    setMessage("Escribe tu nombre y código de sala.");
     return;
   }
 
   busy = true;
   $("joinButton").disabled = true;
+
   currentPlayer = null;
 
   try {
@@ -623,6 +625,7 @@ async function joinIsland() {
             .single();
 
         if (updateError) throw updateError;
+
         currentPlayer = updated;
       }
     }
@@ -635,7 +638,9 @@ async function joinIsland() {
 
       if (error) throw error;
 
-      const taken = new Set((existing || []).map(p => p.role));
+      const taken = new Set(
+        (existing || []).map(player => player.role)
+      );
 
       const role = !taken.has("red")
         ? "red"
@@ -644,7 +649,7 @@ async function joinIsland() {
           : null;
 
       if (!role) {
-        setMessage("La isla ya tiene dos jugadores.");
+        setMessage("La sala ya tiene dos jugadores.");
         return;
       }
 
@@ -667,10 +672,15 @@ async function joinIsland() {
       if (insertError) throw insertError;
 
       currentPlayer = data;
+
       localStorage.setItem(storageKey(roomCode), data.id);
     }
 
+    verticalVelocity = 0;
+    isGrounded = true;
+
     await loadRoom();
+
     subscribeToRoom();
 
     $("playerInfo").textContent =
@@ -678,9 +688,8 @@ async function joinIsland() {
       (currentPlayer.role === "red" ? "Rojo" : "Azul");
 
     setStatus("Conectado · " + roomCode, true);
-    setMessage("¡Bienvenido! Prepárate para explorar la isla.");
+    setMessage("¡Bienvenido! Prepárate para correr.");
 
-    updateCamera();
   } catch (error) {
     console.error(error);
     setMessage("Error al entrar: " + error.message);
@@ -692,9 +701,7 @@ async function joinIsland() {
   }
 }
 
-// ==========================================
-// SINCRONIZACIÓN MULTIJUGADOR
-// ==========================================
+// ---------------- REALTIME ----------------
 
 function subscribeToRoom() {
   if (channel) {
@@ -738,86 +745,7 @@ function subscribeToRoom() {
     });
 }
 
-// ==========================================
-// OBSTÁCULOS
-// ==========================================
-
-function hitsObstacle(x, y) {
-  return OBSTACLES.some(obstacle =>
-    Math.hypot(x - obstacle.x, y - obstacle.y) < 48
-  );
-}
-
-// ==========================================
-// MOVIMIENTO HORIZONTAL
-// ==========================================
-
-async function movePlayer(direction) {
-  if (!currentPlayer || busy) {
-    if (!currentPlayer) setMessage("Primero entra a la isla.");
-    return;
-  }
-
-  if (roomStatus !== "racing") {
-    setMessage("Espera a que comience la carrera.");
-    return;
-  }
-
-  if (currentPlayer.finished_at) return;
-
-  if (direction === "up") {
-    jumpPlayer();
-    return;
-  }
-
-  if (direction !== "left" && direction !== "right") return;
-
-  const amount = direction === "right" ? MOVE_X : -MOVE_X;
-
-  const x = Math.max(
-    35,
-    Math.min(FINISH_X, Number(currentPlayer.x) + amount)
-  );
-
-  const y = Number(currentPlayer.y);
-
-  if (hitsObstacle(x, y)) {
-    setMessage("¡Cuidado! Salta para esquivar el obstáculo.");
-    return;
-  }
-
-  busy = true;
-
-  try {
-    const { data, error } = await supabaseClient
-      .from("treasure_players")
-      .update({
-        x,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", currentPlayer.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    currentPlayer = data;
-    render();
-
-    if (x >= FINISH_X) {
-      await markFinished();
-    }
-  } catch (error) {
-    console.error(error);
-    setMessage("Error al mover: " + error.message);
-  } finally {
-    busy = false;
-  }
-}
-
-// ==========================================
-// SALTOS Y GRAVEDAD
-// ==========================================
+// ---------------- SALTO ----------------
 
 function jumpPlayer() {
   if (!currentPlayer || roomStatus !== "racing") return;
@@ -834,9 +762,7 @@ function physicsStep() {
     currentPlayer.finished_at
   ) return;
 
-  const x = Number(currentPlayer.x);
   const oldY = Number(currentPlayer.y);
-
   let newY = oldY + verticalVelocity;
 
   verticalVelocity += GRAVITY;
@@ -848,6 +774,8 @@ function physicsStep() {
     const newFeet = newY + PLAYER_HALF_HEIGHT;
 
     for (const platform of PLATFORMS) {
+      const x = Number(currentPlayer.x);
+
       const overlaps =
         x + 20 > platform.x &&
         x - 20 < platform.x + platform.width;
@@ -881,38 +809,129 @@ function physicsStep() {
     currentPlayer.role === "red" ? "pirateA" : "pirateB",
     currentPlayer
   );
+}
 
-  const now = Date.now();
+// ---------------- CARRERA AUTOMÁTICA ----------------
 
+function autoRunStep(deltaTime) {
   if (
-    now - lastPhysicsSave >= 150 &&
-    !physicsSaveBusy
-  ) {
-    lastPhysicsSave = now;
-    physicsSaveBusy = true;
+    !currentPlayer ||
+    roomStatus !== "racing" ||
+    currentPlayer.finished_at ||
+    busy
+  ) return;
 
-    supabaseClient
-      .from("treasure_players")
-      .update({
-        y: newY,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", currentPlayer.id)
-      .then(({ error }) => {
-        if (error) console.error("Error guardando salto:", error);
-      })
-      .finally(() => {
-        physicsSaveBusy = false;
-      });
+  let newX = Number(currentPlayer.x);
+
+  const nextX = Math.min(
+    FINISH_X,
+    newX + AUTO_RUN_SPEED * deltaTime
+  );
+
+  // El capitán se detiene frente a los obstáculos
+  // si todavía no ha saltado lo suficiente.
+  const blockingObstacle = OBSTACLES.find(obstacle => {
+    const approaching =
+      nextX >= obstacle.x - 30 &&
+      newX <= obstacle.x + 30;
+
+    const notHighEnough =
+      Number(currentPlayer.y) > obstacle.y - 55;
+
+    return approaching && notHighEnough;
+  });
+
+  if (blockingObstacle) {
+    setMessage("¡Salta ahora para superar el obstáculo!");
+    return;
+  }
+
+  currentPlayer.x = nextX;
+
+  drawPirate(
+    currentPlayer.role === "red" ? "pirateA" : "pirateB",
+    currentPlayer
+  );
+
+  updateCamera();
+
+  if (nextX >= FINISH_X) {
+    markFinished().catch(console.error);
   }
 }
 
-// ==========================================
-// LLEGADA A LA META Y GANADOR
-// ==========================================
+// ---------------- GUARDAR POSICIÓN ----------------
+
+async function savePosition() {
+  if (
+    !currentPlayer ||
+    roomStatus !== "racing" ||
+    savingPosition ||
+    currentPlayer.finished_at
+  ) return;
+
+  savingPosition = true;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("treasure_players")
+      .update({
+        x: Number(currentPlayer.x),
+        y: Number(currentPlayer.y),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", currentPlayer.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (data && currentPlayer) {
+      currentPlayer = {
+        ...currentPlayer,
+        x: data.x,
+        y: data.y
+      };
+    }
+
+  } catch (error) {
+    console.error("Error sincronizando posición:", error);
+  } finally {
+    savingPosition = false;
+  }
+}
+
+// ---------------- BUCLE PRINCIPAL ----------------
+
+function gameStep() {
+  const now = performance.now();
+
+  if (!lastFrameTime) {
+    lastFrameTime = now;
+    return;
+  }
+
+  const deltaTime = Math.min(now - lastFrameTime, 50);
+
+  lastFrameTime = now;
+
+  if (roomStatus !== "racing" || !currentPlayer) return;
+
+  physicsStep();
+  autoRunStep(deltaTime);
+
+  if (now - lastSaveTime >= SAVE_INTERVAL) {
+    lastSaveTime = now;
+    savePosition();
+  }
+}
+
+// ---------------- META Y GANADOR ----------------
 
 async function markFinished() {
   if (!currentPlayer || currentPlayer.finished_at) return;
+
+  currentPlayer.x = FINISH_X;
 
   const { data, error } = await supabaseClient
     .from("treasure_players")
@@ -933,6 +952,7 @@ async function markFinished() {
 
   currentPlayer = data;
 
+  // La función SQL garantiza que solo haya un ganador.
   const { data: winnerData, error: winnerError } =
     await supabaseClient.rpc("claim_race_winner", {
       p_room_code: roomCode,
@@ -941,7 +961,7 @@ async function markFinished() {
 
   if (winnerError) {
     console.error(winnerError);
-    setMessage("No se pudo registrar la victoria: " + winnerError.message);
+    setMessage("No se pudo registrar al ganador: " + winnerError.message);
     return;
   }
 
@@ -975,9 +995,7 @@ async function finishByTimeout() {
   await loadRoom();
 }
 
-// ==========================================
-// PANTALLA WINNER / PERDISTE
-// ==========================================
+// ---------------- PANTALLA FINAL ----------------
 
 function renderFinalResult() {
   let overlay = $("winnerOverlay");
@@ -1007,7 +1025,7 @@ function renderFinalResult() {
 
   if (!winnerId) {
     heading = "TIEMPO AGOTADO";
-    subtitle = "Se acabaron los seis minutos. ¡La carrera terminó!";
+    subtitle = "Se terminaron los seis minutos de carrera.";
   } else if (currentPlayer && winnerId === currentPlayer.id) {
     heading = "WINNER!";
     subtitle = "¡Felicidades, " + winnerName + "! ¡Ganaste la carrera!";
@@ -1037,36 +1055,25 @@ function renderFinalResult() {
   $("playAgainButton").addEventListener("click", restartGame);
 }
 
-// ==========================================
-// RECOGER TESOROS
-// ==========================================
+// ---------------- TESOROS ----------------
 
 async function findTreasure() {
-  if (!currentPlayer || busy) {
-    if (!currentPlayer) setMessage("Primero entra a la isla.");
-    return;
-  }
+  if (!currentPlayer || busy || roomStatus !== "racing") return;
 
-  if (roomStatus !== "racing") {
-    setMessage("Espera a que comience la carrera.");
-    return;
-  }
-
-  const available = TREASURES.filter(treasure =>
-    !roomClaims.some(
+  const nearby = TREASURES.find(treasure => {
+    const alreadyClaimed = roomClaims.some(
       claim => Number(claim.treasure_id) === treasure.id
-    )
-  );
+    );
 
-  const nearby = available.find(treasure =>
-    Math.hypot(
-      Number(currentPlayer.x) - treasure.x,
-      Number(currentPlayer.y) - treasure.y
-    ) < 70
-  );
+    return !alreadyClaimed &&
+      Math.hypot(
+        Number(currentPlayer.x) - treasure.x,
+        Number(currentPlayer.y) - treasure.y
+      ) < 70;
+  });
 
   if (!nearby) {
-    setMessage("No hay un cofre cerca. Sigue explorando.");
+    setMessage("No hay un cofre cerca.");
     return;
   }
 
@@ -1087,8 +1094,7 @@ async function findTreasure() {
     const { data, error: updateError } = await supabaseClient
       .from("treasure_players")
       .update({
-        score: Number(currentPlayer.score) + 1,
-        updated_at: new Date().toISOString()
+        score: Number(currentPlayer.score) + 1
       })
       .eq("id", currentPlayer.id)
       .select()
@@ -1099,25 +1105,26 @@ async function findTreasure() {
     currentPlayer = data;
 
     await loadRoom();
-    setMessage("¡Encontraste un tesoro! Ganaste un punto.");
+
+    setMessage("¡Encontraste un tesoro!");
+
   } catch (error) {
     console.error(error);
 
     setMessage(
       error.code === "23505"
         ? "¡Ese cofre ya fue recogido!"
-        : "Error al guardar el tesoro: " + error.message
+        : "Error al recoger el tesoro: " + error.message
     );
 
     await loadRoom().catch(console.error);
+
   } finally {
     busy = false;
   }
 }
 
-// ==========================================
-// REINICIAR PARTIDA
-// ==========================================
+// ---------------- REINICIAR ----------------
 
 async function restartGame() {
   if (!currentPlayer || busy) return;
@@ -1165,10 +1172,12 @@ async function restartGame() {
 
     verticalVelocity = 0;
     isGrounded = true;
+    lastFrameTime = 0;
 
     await loadRoom();
 
-    setMessage("¡Carrera reiniciada! Ambos jugadores deben estar listos.");
+    setMessage("¡Carrera reiniciada! Ambos deben estar listos.");
+
   } catch (error) {
     console.error(error);
     setMessage("Error al reiniciar: " + error.message);
@@ -1177,9 +1186,7 @@ async function restartGame() {
   }
 }
 
-// ==========================================
-// SALIR DE LA PARTIDA
-// ==========================================
+// ---------------- SALIR ----------------
 
 async function leaveGame() {
   if (!currentPlayer || busy) return;
@@ -1233,6 +1240,7 @@ async function leaveGame() {
 
     setStatus("Has salido de la isla");
     setMessage("Has abandonado la partida.");
+
   } catch (error) {
     console.error(error);
     setMessage("No se pudo abandonar: " + error.message);
@@ -1241,9 +1249,7 @@ async function leaveGame() {
   }
 }
 
-// ==========================================
-// BOTONES
-// ==========================================
+// ---------------- CONTROLES ----------------
 
 function setupControls() {
   $("joinButton").addEventListener("click", joinIsland);
@@ -1254,24 +1260,16 @@ function setupControls() {
 
   document.querySelectorAll("[data-move]").forEach(button => {
     button.addEventListener("click", () => {
-      movePlayer(button.dataset.move);
+      if (
+        button.dataset.move === "up" ||
+        button.dataset.move === "jump"
+      ) {
+        jumpPlayer();
+      }
     });
   });
 
   document.addEventListener("keydown", event => {
-    const keys = {
-      ArrowUp: "up",
-      ArrowDown: "down",
-      ArrowLeft: "left",
-      ArrowRight: "right",
-      w: "up",
-      W: "up",
-      a: "left",
-      A: "left",
-      d: "right",
-      D: "right"
-    };
-
     if (
       ["INPUT", "TEXTAREA"].includes(
         document.activeElement?.tagName
@@ -1280,33 +1278,43 @@ function setupControls() {
       return;
     }
 
-    const movement = keys[event.key];
-
-    if (movement) {
+    if (
+      event.code === "Space" ||
+      event.key === "ArrowUp" ||
+      event.key.toLowerCase() === "w"
+    ) {
       event.preventDefault();
-      movePlayer(movement);
+
+      if (!event.repeat) {
+        jumpPlayer();
+      }
     }
   });
 }
 
-// ==========================================
-// INICIO DEL JUEGO
-// ==========================================
+// ---------------- INICIO ----------------
 
 function initGame() {
   prepareWorld();
   setupControls();
 
-  if ($("readyButton")) $("readyButton").disabled = true;
-  if ($("finalResult")) $("finalResult").hidden = true;
+  if ($("readyButton")) {
+    $("readyButton").disabled = true;
+  }
+
+  if ($("finalResult")) {
+    $("finalResult").hidden = true;
+  }
 
   setStatus("Listo para comenzar");
 
   startTimer();
 
-  if (physicsInterval) clearInterval(physicsInterval);
+  if (gameLoop) {
+    clearInterval(gameLoop);
+  }
 
-  physicsInterval = setInterval(physicsStep, 40);
+  gameLoop = setInterval(gameStep, 40);
 
   window.addEventListener("resize", updateCamera);
 }
