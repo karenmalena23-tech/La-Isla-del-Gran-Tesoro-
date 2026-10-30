@@ -31,14 +31,8 @@ body {
   margin-bottom: 8px;
 }
 
-h1 {
-  font-size: clamp(28px, 5vw, 44px);
-}
-
-.subtitle {
-  color: #d8e9d9;
-  margin-top: 8px;
-}
+h1 { font-size: clamp(28px, 5vw, 44px); }
+.subtitle { color: #d8e9d9; margin-top: 8px; }
 
 .status {
   background: #0d302b;
@@ -61,8 +55,6 @@ h1 {
   box-shadow: 0 10px 25px #0003;
 }
 
-/* INGRESO */
-
 .setup-panel {
   margin-bottom: 25px;
   display: grid;
@@ -71,9 +63,7 @@ h1 {
   align-items: end;
 }
 
-.setup-panel h2 {
-  grid-column: 1 / -1;
-}
+.setup-panel h2 { grid-column: 1 / -1; }
 
 label {
   display: block;
@@ -124,11 +114,7 @@ button:disabled {
   margin-top: 12px;
 }
 
-.setup-panel .helper {
-  grid-column: 1 / -1;
-}
-
-/* SALA DE ESPERA */
+.setup-panel .helper { grid-column: 1 / -1; }
 
 .waiting-room {
   margin-bottom: 25px;
@@ -161,25 +147,11 @@ button:disabled {
   gap: 10px;
 }
 
-.ready-card strong {
-  font-size: 14px;
-}
-
-.red-card {
-  background: #673b3b;
-}
-
-.blue-card {
-  background: #294d70;
-}
-
-.ready-card strong.ready {
-  color: #a9e6a9;
-}
-
-.ready-card strong.waiting {
-  color: #f4ca70;
-}
+.ready-card strong { font-size: 14px; }
+.red-card { background: #673b3b; }
+.blue-card { background: #294d70; }
+.ready-card strong.ready { color: #a9e6a9; }
+.ready-card strong.waiting { color: #f4ca70; }
 
 #readyButton {
   min-width: 190px;
@@ -198,8 +170,6 @@ button:disabled {
   from { transform: scale(1); }
   to { transform: scale(1.12); }
 }
-
-/* DISTRIBUCIÓN */
 
 .game-layout {
   display: grid;
@@ -230,8 +200,6 @@ button:disabled {
   font-weight: bold;
 }
 
-/* CÁMARA */
-
 .island {
   position: relative;
   width: 100%;
@@ -242,8 +210,6 @@ button:disabled {
   background: #78bd65;
   box-shadow: inset 0 0 30px #183d20;
 }
-
-/* MUNDO */
 
 .game-world {
   position: absolute;
@@ -263,8 +229,6 @@ button:disabled {
   );
 }
 
-/* FONDO */
-
 .world-background {
   position: absolute;
   inset: 0;
@@ -274,8 +238,6 @@ button:disabled {
     radial-gradient(ellipse at 75% 18%, #d6e99c 0 5%, transparent 6%),
     linear-gradient(to bottom, transparent 55%, #6aab50 56%);
 }
-
-/* DECORACIÓN */
 
 .world-decoration {
   position: absolute;
@@ -289,13 +251,7 @@ button:disabled {
 .decoration-three { left: 980px; top: 165px; }
 .decoration-four { left: 1450px; top: 145px; }
 .decoration-five { left: 1900px; top: 165px; }
-.decoration-six {
-  left: 1150px;
-  top: 60px;
-  font-size: 40px;
-}
-
-/* SUELO */
+.decoration-six { left: 1150px; top: 60px; font-size: 40px; }
 
 .ground {
   position: absolute;
@@ -319,41 +275,19 @@ button:disabled {
   border-top: 5px solid #b2d76b;
 }
 
-/* PLATAFORMAS */
-
 .platform {
   position: absolute;
   z-index: 4;
   height: 20px;
   border-radius: 10px 10px 4px 4px;
-  background: linear-gradient(
-    to bottom,
-    #a7d36c 0 25%,
-    #805b37 26% 100%
-  );
+  background: linear-gradient(to bottom, #a7d36c 0 25%, #805b37 26% 100%);
   border-top: 3px solid #d5e58d;
   box-shadow: 0 6px 0 #4d6738;
 }
 
-.platform-one {
-  left: 430px;
-  bottom: 145px;
-  width: 180px;
-}
-
-.platform-two {
-  left: 1050px;
-  bottom: 190px;
-  width: 190px;
-}
-
-.platform-three {
-  left: 1720px;
-  bottom: 135px;
-  width: 220px;
-}
-
-/* OBSTÁCULOS Y TESOROS */
+.platform-one { left: 430px; bottom: 145px; width: 180px; }
+.platform-two { left: 1050px; bottom: 190px; width: 190px; }
+.platform-three { left: 1720px; bottom: 135px; width: 220px; }
 
 #obstacleArea,
 #treasureArea {
@@ -365,27 +299,17 @@ button:disabled {
 
 .obstacle {
   position: absolute;
-  display: block;
-  width: 64px;
-  height: 64px;
-  max-width: none;
-  object-fit: contain;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  font-size: 48px;
+  line-height: 1;
   transform: translate(-50%, -50%);
   z-index: 5;
   overflow: visible;
-  image-rendering: auto;
-}
-
-.obstacle img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: contain;
-  object-position: center;
+  white-space: nowrap;
+  user-select: none;
 }
 
 .treasure {
@@ -395,8 +319,6 @@ button:disabled {
   transform: translate(-50%, -50%);
   z-index: 6;
 }
-
-/* META */
 
 .finish-line {
   position: absolute;
@@ -413,8 +335,6 @@ button:disabled {
   text-align: center;
   box-shadow: 0 3px 8px #0005;
 }
-
-/* CAPITANES */
 
 .pirate {
   position: absolute;
@@ -440,8 +360,6 @@ button:disabled {
   border: 3px solid #fff;
 }
 
-/* CONTROLES */
-
 .controls {
   margin-top: 18px;
   display: flex;
@@ -450,10 +368,7 @@ button:disabled {
   gap: 12px;
 }
 
-.controls div {
-  display: flex;
-  gap: 5px;
-}
+.controls div { display: flex; gap: 5px; }
 
 .controls button {
   background: #dce9ce;
@@ -495,11 +410,7 @@ button:disabled {
   min-height: 42px;
 }
 
-/* MARCADOR */
-
-.scoreboard h2 {
-  margin-bottom: 20px;
-}
+.scoreboard h2 { margin-bottom: 20px; }
 
 .score-card {
   display: flex;
@@ -510,13 +421,8 @@ button:disabled {
   margin-bottom: 12px;
 }
 
-.player-symbol {
-  font-size: 27px;
-}
-
-.score-card h3 {
-  font-size: 15px;
-}
+.player-symbol { font-size: 27px; }
+.score-card h3 { font-size: 15px; }
 
 .score-card p {
   font-size: 12px;
@@ -529,9 +435,7 @@ button:disabled {
   font-size: 25px;
 }
 
-.activity-title {
-  margin: 25px 0 12px;
-}
+.activity-title { margin: 25px 0 12px; }
 
 .activity-list {
   padding-left: 20px;
@@ -539,8 +443,6 @@ button:disabled {
   font-size: 13px;
   line-height: 1.9;
 }
-
-/* RESULTADO */
 
 .final-result {
   margin-top: 22px;
@@ -561,11 +463,7 @@ button:disabled {
   color: #fff4cf;
 }
 
-/* INSTRUCCIONES Y PIE */
-
-.instructions {
-  margin-top: 25px;
-}
+.instructions { margin-top: 25px; }
 
 .instructions ol {
   padding-left: 22px;
@@ -580,8 +478,6 @@ footer {
   color: #a8c4b1;
   font-size: 12px;
 }
-
-/* ELEMENTOS ADICIONALES */
 
 .platform-area {
   position: absolute;
@@ -609,9 +505,7 @@ footer {
   background: rgba(5, 12, 25, 0.88);
 }
 
-.winner-overlay[hidden] {
-  display: none;
-}
+.winner-overlay[hidden] { display: none; }
 
 .winner-card {
   width: min(90%, 500px);
@@ -631,67 +525,28 @@ footer {
   letter-spacing: 3px;
 }
 
-.winner-card p {
-  font-size: 20px;
-  line-height: 1.5;
-}
+.winner-card p { font-size: 20px; line-height: 1.5; }
 
 .winner-card button {
   margin-top: 20px;
   padding: 14px 25px;
-  border: 0;
-  border-radius: 12px;
   background: #e6b84d;
   color: #172333;
   font-size: 17px;
-  font-weight: bold;
-  cursor: pointer;
 }
 
-/* MÓVILES */
-
 @media (max-width: 760px) {
-  .setup-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .game-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .header {
-    padding: 25px 5%;
-  }
-
-  .island {
-    height: 340px;
-  }
-
-  .panel {
-    padding: 17px;
-  }
-
-  .world-decoration {
-    font-size: 48px;
-  }
-
-  .pirate {
-    width: 42px;
-    height: 46px;
-    font-size: 29px;
-  }
+  .setup-panel { grid-template-columns: 1fr; }
+  .game-layout { grid-template-columns: 1fr; }
+  .header { padding: 25px 5%; }
+  .island { height: 340px; }
+  .panel { padding: 17px; }
+  .world-decoration { font-size: 48px; }
+  .pirate { width: 42px; height: 46px; font-size: 29px; }
 }
 
 @media (max-width: 600px) {
-  .ready-players {
-    grid-template-columns: 1fr;
-  }
-
-  .controls {
-    justify-content: center;
-  }
-
-  .game-options button {
-    flex: 1;
-  }
+  .ready-players { grid-template-columns: 1fr; }
+  .controls { justify-content: center; }
+  .game-options button { flex: 1; }
 }
