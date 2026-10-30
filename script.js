@@ -1,6 +1,24 @@
+
+// ==========================================
 // DETECTIVES EN DUELO
-// Primera versión: funcionamiento local de demostración.
-// Las salas todavía no están conectadas entre dispositivos.
+// Conexión inicial con Supabase
+// ==========================================
+
+// 1. PEGA AQUÍ TUS DATOS DE SUPABASE
+const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
+
+// 2. CONECTAR CON SUPABASE
+const { createClient } = supabase;
+
+const supabaseClient = createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+// ==========================================
+// ELEMENTOS DE LA PÁGINA
+// ==========================================
 
 const homeScreen = document.getElementById("home-screen");
 const roomScreen = document.getElementById("room-screen");
@@ -26,11 +44,26 @@ const nextButton = document.getElementById("next-button");
 const clueElement = document.querySelector(".clue");
 const answerButtons = document.querySelectorAll(".answer-button");
 
+const backRoomButton = document.getElementById("back-room-button");
+const backJoinButton = document.getElementById("back-join-button");
+
+// ==========================================
+// VARIABLES
+// ==========================================
+
 let score = 0;
 let timeLeft = 20;
 let timer = null;
 let currentQuestion = 0;
 let answered = false;
+
+let currentRoomId = null;
+let currentUserId = null;
+let realtimeChannel = null;
+
+// ==========================================
+// ACERTIJOS
+// ==========================================
 
 const questions = [
   {
@@ -62,12 +95,20 @@ const questions = [
   }
 ];
 
+// ==========================================
+// FUNCIONES GENERALES
+// ==========================================
+
 function showScreen(screen) {
   [homeScreen, roomScreen, joinScreen, gameScreen].forEach(item => {
     item.classList.add("hidden");
   });
 
   screen.classList.remove("hidden");
+}
+
+function showError(element, message) {
+  if (element) element.textContent = message;
 }
 
 function generateRoomCode() {
@@ -81,17 +122,153 @@ function generateRoomCode() {
   return code;
 }
 
-// Crear sala de demostración
-createButton.addEventListener("click", () => {
-  const code = generateRoomCode();
+// ==========================================
+// INICIAR SESIÓN ANÓNIMA
+// ==========================================
 
-  roomCodeElement.textContent = code;
-  homeMessage.textContent = "";
+async function ensureLogin() {
+  const { data: sessionData, error: sessionError } =
+    await supabaseClient.auth.getSession();
 
-  showScreen(roomScreen);
+  if (sessionError) throw sessionError;
+
+  if (sessionData.session) {
+    currentUserId = sessionData.session.user.id;
+    return currentUserId;
+  }
+
+  const { data, error } =
+    await supabaseClient.auth.signInAnonymously();
+
+  if (error) throw error;
+
+  currentUserId = data.user.id;
+  return currentUserId;
+}
+
+// ==========================================
+// CREAR UNA SALA REAL
+// ==========================================
+
+createButton.addEventListener("click", async () => {
+  createButton.disabled = true;
+  showError(homeMessage, "🔎 Creando tu sala...");
+
+  try {
+    const userId = await ensureLogin();
+
+    const code = generateRoomCode();
+
+    const { data: room, error: roomError } =
+      await supabaseClient
+        .from("rooms")
+        .insert({
+          code: code,
+          created_by: userId
+        })
+        .select()
+        .single();
+
+    if (roomError) throw roomError;
+
+    const { error: playerError } =
+      await supabaseClient
+        .from("players")
+        .insert({
+          room_id: room.id,
+          user_id: userId,
+          nickname: "Detective 1"
+        });
+
+    if (playerError) throw playerError;
+
+    currentRoomId = room.id;
+
+    roomCodeElement.textContent = code;
+    showError(homeMessage, "");
+
+    showScreen(roomScreen);
+
+    listenToRoom();
+
+    showRoomStatus("⏳ Esperando al segundo detective...");
+
+  } catch (error) {
+    console.error(error);
+    showError(
+      homeMessage,
+      "❌ No se pudo crear la sala: " + error.message
+    );
+  } finally {
+    createButton.disabled = false;
+  }
 });
 
-// Botón para copiar el código
+// ==========================================
+// ESTADO Y ACTUALIZACIONES DE LA SALA
+// ==========================================
+
+function showRoomStatus(message) {
+  let status = document.getElementById("room-status");
+
+  if (!status) {
+    status = document.createElement("p");
+    status.id = "room-status";
+
+    const backButton = document.getElementById("back-room-button");
+
+    if (backButton) {
+      roomScreen.insertBefore(status, backButton);
+    } else {
+      roomScreen.appendChild(status);
+    }
+  }
+
+  status.textContent = message;
+}
+
+async function listenToRoom() {
+  if (!currentRoomId) return;
+
+  if (realtimeChannel) {
+    await supabaseClient.removeChannel(realtimeChannel);
+  }
+
+  realtimeChannel = supabaseClient
+    .channel("sala-" + currentRoomId)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "players",
+        filter: "room_id=eq." + currentRoomId
+      },
+      async () => {
+        const { data, error } = await supabaseClient
+          .from("players")
+          .select("id")
+          .eq("room_id", currentRoomId);
+
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        if (data.length >= 2) {
+          showRoomStatus("🕵️ ¡Ya están los dos detectives! Sala lista.");
+        } else {
+          showRoomStatus("⏳ Esperando al segundo detective...");
+        }
+      }
+    )
+    .subscribe();
+}
+
+// ==========================================
+// COPIAR CÓDIGO
+// ==========================================
+
 copyButton.addEventListener("click", async () => {
   const code = roomCodeElement.textContent;
 
@@ -103,44 +280,125 @@ copyButton.addEventListener("click", async () => {
   }
 });
 
-// Añadir botón para probar el acertijo
-const testButton = document.createElement("button");
-testButton.className = "main-button";
-testButton.textContent = "🧩 Probar acertijos";
-roomScreen.insertBefore(testButton, document.getElementById("back-room-button"));
+// ==========================================
+// IR A UNIRSE A UNA SALA
+// ==========================================
 
-testButton.addEventListener("click", startGame);
-
-// Ir a la pantalla para unirse
 joinButton.addEventListener("click", () => {
   joinMessage.textContent = "";
   roomInput.value = "";
   showScreen(joinScreen);
 });
 
-// Comprobar el código introducido
-enterButton.addEventListener("click", () => {
+// ==========================================
+// UNIRSE A UNA SALA REAL
+// ==========================================
+
+enterButton.addEventListener("click", async () => {
   const code = roomInput.value.trim().toUpperCase();
 
   if (code.length !== 6) {
-    joinMessage.textContent = "❌ El código debe tener 6 caracteres.";
+    showError(joinMessage, "❌ El código debe tener 6 caracteres.");
     return;
   }
 
-  joinMessage.textContent =
-    "🚧 El código tiene el formato correcto, pero todavía falta conectar Supabase para encontrar salas reales desde otro dispositivo.";
+  enterButton.disabled = true;
+  showError(joinMessage, "🔎 Buscando la sala...");
+
+  try {
+    const userId = await ensureLogin();
+
+    const { data: room, error: roomError } =
+      await supabaseClient
+        .from("rooms")
+        .select("*")
+        .eq("code", code)
+        .eq("status", "waiting")
+        .maybeSingle();
+
+    if (roomError) throw roomError;
+
+    if (!room) {
+      showError(joinMessage, "❌ No encontramos esa sala.");
+      return;
+    }
+
+    const { data: players, error: playersError } =
+      await supabaseClient
+        .from("players")
+        .select("id, user_id")
+        .eq("room_id", room.id);
+
+    if (playersError) throw playersError;
+
+    if (players.some(player => player.user_id === userId)) {
+      showError(joinMessage, "Ya estás dentro de esta sala.");
+      return;
+    }
+
+    if (players.length >= 2) {
+      showError(joinMessage, "❌ Esta sala ya tiene dos detectives.");
+      return;
+    }
+
+    const { error: insertError } =
+      await supabaseClient
+        .from("players")
+        .insert({
+          room_id: room.id,
+          user_id: userId,
+          nickname: "Detective 2"
+        });
+
+    if (insertError) throw insertError;
+
+    currentRoomId = room.id;
+
+    showScreen(roomScreen);
+    roomCodeElement.textContent = code;
+
+    listenToRoom();
+
+    showRoomStatus("🎉 ¡Te has unido! Ya están los dos detectives.");
+
+  } catch (error) {
+    console.error(error);
+    showError(
+      joinMessage,
+      "❌ Error al entrar: " + error.message
+    );
+  } finally {
+    enterButton.disabled = false;
+  }
 });
 
-// Volver al menú
-document.getElementById("back-room-button").addEventListener("click", () => {
+// ==========================================
+// VOLVER AL MENÚ
+// ==========================================
+
+backRoomButton.addEventListener("click", () => {
   showScreen(homeScreen);
 });
 
-document.getElementById("back-join-button").addEventListener("click", () => {
+backJoinButton.addEventListener("click", () => {
   showScreen(homeScreen);
 });
 
-// Iniciar el juego de acertijos
+// ==========================================
+// INICIAR ACERTIJOS
+// ==========================================
+
+const testButton = document.createElement("button");
+testButton.className = "main-button";
+testButton.textContent = "🧩 Probar acertijos";
+
+roomScreen.insertBefore(
+  testButton,
+  document.getElementById("back-room-button")
+);
+
+testButton.addEventListener("click", startGame);
+
 function startGame() {
   score = 0;
   currentQuestion = 0;
@@ -151,7 +409,10 @@ function startGame() {
   loadQuestion();
 }
 
-// Cargar un acertijo
+// ==========================================
+// CARGAR ACERTIJO
+// ==========================================
+
 function loadQuestion() {
   clearInterval(timer);
 
@@ -178,7 +439,10 @@ function loadQuestion() {
   updateProgress();
 }
 
-// Temporizador
+// ==========================================
+// TEMPORIZADOR
+// ==========================================
+
 function startTimer() {
   timeLeft = 20;
   timerElement.textContent = timeLeft;
@@ -200,12 +464,14 @@ function startTimer() {
   }, 1000);
 }
 
-// Actualizar la barra de tiempo
 function updateProgress() {
   progressBar.style.width = (timeLeft / 20) * 100 + "%";
 }
 
-// Comprobar respuesta
+// ==========================================
+// COMPROBAR RESPUESTAS
+// ==========================================
+
 answerButtons.forEach(button => {
   button.addEventListener("click", () => {
     if (answered) return;
@@ -233,25 +499,33 @@ answerButtons.forEach(button => {
         }
       });
 
-      answerMessage.textContent = "🔎 ¡Buen intento! La pista estaba frente a ti.";
+      answerMessage.textContent =
+        "🔎 ¡Buen intento! La pista estaba frente a ti.";
     }
 
     nextButton.classList.remove("hidden");
   });
 });
 
-// Siguiente acertijo
+// ==========================================
+// SIGUIENTE ACERTIJO
+// ==========================================
+
 nextButton.addEventListener("click", () => {
   currentQuestion++;
   loadQuestion();
 });
 
-// Terminar partida
+// ==========================================
+// TERMINAR PARTIDA
+// ==========================================
+
 function finishGame() {
   clearInterval(timer);
 
   clueElement.textContent = "🏆 ¡Investigación completada!";
-  answerMessage.textContent = "Tu puntuación final: " + score + " puntos.";
+  answerMessage.textContent =
+    "Tu puntuación final: " + score + " puntos.";
 
   answerButtons.forEach(button => {
     button.classList.add("hidden");
@@ -259,7 +533,12 @@ function finishGame() {
 
   nextButton.classList.add("hidden");
 
+  const oldRestart = document.getElementById("restart-button");
+
+  if (oldRestart) oldRestart.remove();
+
   const restartButton = document.createElement("button");
+  restartButton.id = "restart-button";
   restartButton.className = "main-button";
   restartButton.textContent = "🔄 Jugar otra vez";
 
