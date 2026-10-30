@@ -320,3 +320,24 @@ document.querySelectorAll("[data-move]").forEach(button => {
 });
 
 setStatus("Listo para comenzar");
+
+// CONTROLES CON EL TECLADO DE LA COMPUTADORA
+document.addEventListener("keydown", (event) => {
+  const teclas = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    w: "up",
+    s: "down",
+    a: "left",
+    d: "right"
+  };
+
+  const movimiento = teclas[event.key];
+
+  if (movimiento) {
+    event.preventDefault();
+    movePlayer(movimiento);
+  }
+});
