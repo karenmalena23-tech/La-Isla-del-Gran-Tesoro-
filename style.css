@@ -383,3 +383,146 @@ footer {
   transform: translate(-50%, -50%);
   transition: left 0.2s, top 0.2s;
 }
+
+/* =================================
+   SALA DE ESPERA
+================================= */
+
+.waiting-room {
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.waiting-room h2 {
+  margin-bottom: 10px;
+  color: #f4ca70;
+}
+
+.waiting-room > p {
+  color: #c8d9c9;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ready-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.ready-card {
+  padding: 18px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ready-card strong {
+  font-size: 14px;
+}
+
+.ready-card span {
+  font-weight: bold;
+}
+
+.ready-card strong.ready {
+  color: #a9e6a9;
+}
+
+.ready-card strong.waiting {
+  color: #f4ca70;
+}
+
+#readyButton {
+  min-width: 190px;
+  margin-top: 5px;
+}
+
+#readyButton:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.countdown {
+  font-size: 55px;
+  font-weight: bold;
+  color: #f4ca70;
+  margin-top: 15px;
+  animation: countdownPulse .8s infinite alternate;
+}
+
+@keyframes countdownPulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.12);
+  }
+}
+
+/* =================================
+   META DE LA CARRERA
+================================= */
+
+.finish-line {
+  position: absolute;
+  right: 3%;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  padding: 10px 7px;
+  background: #fff4cf;
+  color: #30230d;
+  border: 3px dashed #d5a84d;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 3px 8px #0005;
+}
+
+/* =================================
+   RESULTADO FINAL
+================================= */
+
+.final-result {
+  margin-top: 22px;
+  padding: 18px;
+  text-align: center;
+  background: #284f3b;
+  border: 2px solid #d5a84d;
+  border-radius: 14px;
+}
+
+.final-result h2 {
+  color: #f4ca70;
+  margin-bottom: 10px;
+}
+
+.final-result p {
+  line-height: 1.6;
+  color: #fff4cf;
+}
+
+/* =================================
+   AJUSTES PARA MÓVILES
+================================= */
+
+@media (max-width: 600px) {
+  .ready-players {
+    grid-template-columns: 1fr;
+  }
+
+  .finish-line {
+    font-size: 10px;
+    right: 1%;
+    padding: 7px 4px;
+  }
+
+  .island {
+    min-height: 300px;
+  }
+}
