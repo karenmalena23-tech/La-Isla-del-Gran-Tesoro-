@@ -4,88 +4,82 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Detectives en Duelo</title>
+  <title>La Isla del Gran Tesoro</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="container">
-    <h1>🕵️ Detectives en Duelo</h1>
-    <p class="subtitle">Dos detectives, un mismo misterio.</p>
+  <main class="app">
+    <header>
+      <div class="logo">🏝️</div>
+      <h1>La Isla del Gran Tesoro</h1>
+      <p>¡Explora, salta y encuentra tesoros con tu compañero!</p>
+    </header>
 
-    <section id="home-screen" class="panel">
-      <h2>Entrar al caso</h2>
-      <label for="nickname">Tu nombre</label>
-      <input id="nickname" maxlength="20" placeholder="Escribe tu nombre">
+    <section id="menu" class="panel">
+      <h2>¡Comienza tu aventura!</h2>
 
-      <button id="create-button">Crear sala</button>
+      <label for="nickname">Tu nombre de aventurero</label>
+      <input id="nickname" maxlength="18" placeholder="Escribe tu nombre">
 
-      <div class="separator">O únete a una sala</div>
-      <label for="room-input">Código de sala</label>
-      <input id="room-input" maxlength="6" placeholder="Código">
-      <button id="join-button">Unirme</button>
-      <p id="home-message" class="message"></p>
-    </section>
-
-    <section id="room-screen" class="panel hidden">
-      <h2>Sala de investigación</h2>
-      <p>Código: <strong id="room-code"></strong></p>
-      <button id="copy-button" class="secondary">Copiar código</button>
-      <h3>Detectives</h3>
-      <ul id="players-list"></ul>
-      <p id="ready-status">Esperando a los detectives...</p>
-      <button id="ready-button">Estoy listo</button>
-    </section>
-
-    <section id="game-screen" class="panel hidden">
-      <h2>🗂️ Caso: El trofeo desaparecido</h2>
-      <p class="story">
-        Durante la exposición escolar desapareció el trofeo.
-        Tres personas estuvieron cerca del lugar: Lucía, Mateo y Sofía.
-        ¡Reúnan las pistas y descubran quién lo tomó!
-      </p>
-
-      <h3>Pistas</h3>
-      <div id="board-content" class="clues">
-        <p>1. El trofeo estaba en la biblioteca antes del recreo.</p>
-        <p>2. Una persona fue vista cerca de la biblioteca.</p>
-        <p>3. Sofía dijo que estuvo en el patio, pero su nombre aparece en el registro de la biblioteca.</p>
-      </div>
-
-      <h3>Tablero compartido</h3>
-      <div class="board-form">
-        <select id="board-kind">
-          <option value="pista">Pista</option>
-          <option value="teoria">Teoría</option>
-          <option value="nota">Nota</option>
-        </select>
-        <input id="board-content-input" placeholder="Escribe una pista o teoría">
-        <button id="add-board-button">Añadir al tablero</button>
-      </div>
-      <ul id="board-list"></ul>
-
-      <h3>Chat del equipo</h3>
-      <div id="chat-list" class="chat-list"></div>
-      <div class="chat-form">
-        <input id="chat-input" maxlength="300" placeholder="Escribe un mensaje">
-        <button id="send-button">Enviar</button>
-      </div>
-
-      <h3>Conclusión del equipo</h3>
-      <label for="final-suspect">¿Quién creen que tomó el trofeo?</label>
-      <select id="final-suspect">
-        <option value="">Elige un sospechoso</option>
-        <option value="Lucía">Lucía</option>
-        <option value="Mateo">Mateo</option>
-        <option value="Sofía">Sofía</option>
+      <label for="character">Elige tu personaje</label>
+      <select id="character">
+        <option value="Nico">🧢 Nico, el explorador</option>
+        <option value="Luna">🌙 Luna, la aventurera</option>
+        <option value="Coco">🏴‍☠️ Capitán Coco</option>
+        <option value="Chispa">🦊 Chispa, el zorrito</option>
       </select>
-      <label for="final-reason">¿Qué pistas justifican su respuesta?</label>
-      <textarea id="final-reason" placeholder="Escriban su explicación"></textarea>
-      <button id="submit-conclusion">Enviar conclusión</button>
-      <p id="final-message" class="message"></p>
 
-      <h3>Puntuación</h3>
-      <ul id="scores-list"></ul>
+      <button id="createBtn">🌴 Crear una partida</button>
+
+      <div class="separator">O únete a un amigo</div>
+
+      <label for="roomCode">Código de la partida</label>
+      <input id="roomCode" maxlength="6" placeholder="Ejemplo: ABC123">
+      <button id="joinBtn" class="secondary">🚀 Unirme a la partida</button>
+
+      <p id="menuMessage" class="message"></p>
     </section>
+
+    <section id="game" class="hidden">
+      <div class="game-top panel">
+        <div>
+          <strong>🏝️ La Isla del Gran Tesoro</strong>
+          <p>Sala: <span id="codeLabel">------</span>
+            <button id="copyBtn" class="small">Copiar</button>
+          </p>
+        </div>
+        <div class="score-area">
+          <span>🪙 Tus monedas: <strong id="score">0</strong></span>
+          <span id="playerStatus">Esperando compañero...</span>
+        </div>
+      </div>
+
+      <div class="game-frame">
+        <canvas id="gameCanvas" width="960" height="440"></canvas>
+      </div>
+
+      <div class="instructions panel">
+        <strong>Cómo jugar:</strong>
+        <span>← → o A/D para moverte</span>
+        <span>↑, W o ESPACIO para saltar</span>
+        <span>¡Recoge las monedas y busca el cofre!</span>
+      </div>
+
+      <div class="mobile-controls">
+        <button id="leftBtn">◀</button>
+        <button id="jumpBtn">⬆ SALTAR</button>
+        <button id="rightBtn">▶</button>
+      </div>
+
+      <div class="panel players-panel">
+        <h3>🧑‍🤝‍🧑 Exploradores conectados</h3>
+        <div id="playersList">Conectando...</div>
+      </div>
+
+      <p id="gameMessage" class="message"></p>
+    </section>
+
+    <footer>Hecho para pequeños grandes aventureros ✨</footer>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
