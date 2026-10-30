@@ -34,6 +34,7 @@ const GRAVITY = 0.65;
 const JUMP_FORCE = -13;
 const PLAYER_SPEED = 5;
 const SAVE_INTERVAL = 200;
+const MOVEMENT_INTERVAL = 40;
 
 const TREASURES = [
   { id: 1, x: 350, y: 300 },
@@ -84,12 +85,16 @@ let channel = null;
 let busy = false;
 let loadingRoom = false;
 let savingPosition = false;
+let finishing = false;
 
 let verticalVelocity = 0;
 let isGrounded = true;
 
 let lastFrameTime = 0;
 let lastSaveTime = 0;
+let lastMovementTime = 0;
+
+let pressedKeys = new Set();
 
 let gameLoop = null;
 let timerInterval = null;
@@ -308,7 +313,24 @@ async function loadRoom() {
         player => player.id === currentPlayer.id
       );
 
-      if (updated) currentPlayer = updated;
+      if (updated) {
+        currentPlayer = {
+          ...updated,
+          x: currentPlayer.x,
+          y: currentPlayer.y
+        };
+
+        // Si la base de datos confirma una posición más reciente,
+        // se utiliza esa posición cuando no hay movimiento local.
+        if (!pressedKeys.size && !savingPosition) {
+          currentPlayer.x = Number(updated.x);
+          currentPlayer.y = Number(updated.y);
+        }
+
+        if (updated.finished_at) {
+          currentPlayer.finished_at = updated.finished_at;
+        }
+      }
     }
 
     if (roomData) {
@@ -363,6 +385,7 @@ async function advanceRoomState() {
 
   lastFrameTime = 0;
   lastSaveTime = 0;
+  lastMovementTime = 0;
 
   render();
   updateTimer();
@@ -423,10 +446,15 @@ function drawObstacles() {
   if (!area) return;
 
   area.innerHTML = OBSTACLES.map(obstacle => `
-    <span class="obstacle"
-      style="left:${obstacle.x}px;top:${obstacle.y}px">
-      ${obstacle.icon}
-    </span>
+    <span
+      class="obstacle"
+      role="img"
+      aria-label="Obstáculo"
+      style="
+        left:${obstacle.x}px;
+        top:${obstacle.y}px;
+      "
+    >${obstacle.icon}</span>
   `).join("");
 }
 
@@ -435,13 +463,14 @@ function drawPlatforms() {
   if (!area) return;
 
   area.innerHTML = PLATFORMS.map(platform => `
-    <div class="game-platform"
+    <div
+      class="game-platform"
       style="
         left:${platform.x}px;
         top:${platform.top}px;
         width:${platform.width}px;
-      ">
-    </div>
+      "
+    ></div>
   `).join("");
 }
 
@@ -456,10 +485,13 @@ function drawTreasures() {
   area.innerHTML = TREASURES
     .filter(treasure => !claimed.has(treasure.id))
     .map(treasure => `
-      <span class="treasure"
-        style="left:${treasure.x}px;top:${treasure.y}px">
-        🧰
-      </span>
+      <span
+        class="treasure"
+        style="
+          left:${treasure.x}px;
+          top:${treasure.y}px;
+        "
+      >🧰</span>
     `)
     .join("");
 }
@@ -533,7 +565,9 @@ async function markReady() {
 
   busy = true;
 
-  $("readyButton").disabled = true;
+  if ($("readyButton")) {
+    $("readyButton").disabled = true;
+  }
 
   try {
     const { error } = await supabaseClient.rpc(
@@ -579,7 +613,10 @@ async function joinIsland() {
   }
 
   busy = true;
-  $("joinButton").disabled = true;
+
+  if ($("joinButton")) {
+    $("joinButton").disabled = true;
+  }
 
   currentPlayer = null;
 
@@ -670,14 +707,18 @@ async function joinIsland() {
 
     verticalVelocity = 0;
     isGrounded = true;
+    pressedKeys.clear();
+    finishing = false;
 
     await loadRoom();
 
     subscribeToRoom();
 
-    $("playerInfo").textContent =
-      "Estás jugando como Pirata " +
-      (currentPlayer.role === "red" ? "Rojo" : "Azul");
+    if ($("playerInfo")) {
+      $("playerInfo").textContent =
+        "Estás jugando como Pirata " +
+        (currentPlayer.role === "red" ? "Rojo" : "Azul");
+    }
 
     setStatus("Conectado · " + roomCode, true);
     setMessage("¡Bienvenido! Prepárate para correr.");
@@ -688,7 +729,11 @@ async function joinIsland() {
     setStatus("Error de conexión");
   } finally {
     busy = false;
-    $("joinButton").disabled = false;
+
+    if ($("joinButton")) {
+      $("joinButton").disabled = false;
+    }
+
     renderWaitingRoom();
   }
 }
@@ -741,7 +786,7 @@ function subscribeToRoom() {
 
 function jumpPlayer() {
   if (!currentPlayer || roomStatus !== "racing") return;
-  if (!isGrounded || currentPlayer.finished_at) return;
+  if (!isGrounded || currentPlayer.finished_at || finishing) return;
 
   verticalVelocity = JUMP_FORCE;
   isGrounded = false;
@@ -751,7 +796,8 @@ function physicsStep() {
   if (
     !currentPlayer ||
     roomStatus !== "racing" ||
-    currentPlayer.finished_at
+    currentPlayer.finished_at ||
+    finishing
   ) return;
 
   const oldY = Number(currentPlayer.y);
@@ -810,6 +856,7 @@ function movePlayer(direction) {
     !currentPlayer ||
     roomStatus !== "racing" ||
     currentPlayer.finished_at ||
+    finishing ||
     busy
   ) return;
 
@@ -857,30 +904,35 @@ async function savePosition() {
     !currentPlayer ||
     roomStatus !== "racing" ||
     savingPosition ||
-    currentPlayer.finished_at
+    currentPlayer.finished_at ||
+    finishing
   ) return;
 
   savingPosition = true;
+
+  const playerId = currentPlayer.id;
+  const positionX = Number(currentPlayer.x);
+  const positionY = Number(currentPlayer.y);
 
   try {
     const { data, error } = await supabaseClient
       .from("treasure_players")
       .update({
-        x: Number(currentPlayer.x),
-        y: Number(currentPlayer.y),
+        x: positionX,
+        y: positionY,
         updated_at: new Date().toISOString()
       })
-      .eq("id", currentPlayer.id)
+      .eq("id", playerId)
       .select()
       .single();
 
     if (error) throw error;
 
-    if (data && currentPlayer) {
+    if (data && currentPlayer && currentPlayer.id === playerId) {
       currentPlayer = {
         ...currentPlayer,
-        x: data.x,
-        y: data.y
+        x: positionX,
+        y: positionY
       };
     }
 
@@ -905,8 +957,28 @@ function gameStep() {
 
   if (roomStatus !== "racing" || !currentPlayer) return;
 
+  // Movimiento continuo mientras se mantiene presionada una tecla.
+  if (now - lastMovementTime >= MOVEMENT_INTERVAL) {
+    if (pressedKeys.has("ArrowRight") || pressedKeys.has("KeyD")) {
+      movePlayer("right");
+    } else if (
+      pressedKeys.has("ArrowLeft") ||
+      pressedKeys.has("KeyA")
+    ) {
+      movePlayer("left");
+    }
+
+    if (pressedKeys.has("ArrowDown") || pressedKeys.has("KeyS")) {
+      movePlayer("down");
+    }
+
+    lastMovementTime = now;
+  }
+
+  // La física se mantiene activa durante el salto.
   physicsStep();
 
+  // Sincronizar la posición con Supabase.
   if (now - lastSaveTime >= SAVE_INTERVAL) {
     lastSaveTime = now;
     savePosition();
@@ -916,52 +988,61 @@ function gameStep() {
 // ---------------- META Y GANADOR ----------------
 
 async function markFinished() {
-  if (!currentPlayer || currentPlayer.finished_at) return;
+  if (
+    !currentPlayer ||
+    currentPlayer.finished_at ||
+    finishing
+  ) return;
+
+  finishing = true;
+  pressedKeys.clear();
+
+  const playerId = currentPlayer.id;
 
   currentPlayer.x = FINISH_X;
 
-  const { data, error } = await supabaseClient
-    .from("treasure_players")
-    .update({
-      x: FINISH_X,
-      finished_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", currentPlayer.id)
-    .is("finished_at", null)
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabaseClient
+      .from("treasure_players")
+      .update({
+        x: FINISH_X,
+        finished_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", playerId)
+      .is("finished_at", null)
+      .select()
+      .single();
 
-  if (error) {
-    console.error(error);
-    return;
+    if (error) throw error;
+
+    currentPlayer = data;
+
+    const { data: winnerData, error: winnerError } =
+      await supabaseClient.rpc("claim_race_winner", {
+        p_room_code: roomCode,
+        p_player_id: currentPlayer.id
+      });
+
+    if (winnerError) throw winnerError;
+
+    roomData = {
+      ...roomData,
+      ...winnerData
+    };
+
+    roomStatus = "finished";
+    verticalVelocity = 0;
+
+    await loadRoom();
+
+    setMessage("¡La carrera terminó!");
+
+  } catch (error) {
+    console.error("Error registrando llegada:", error);
+    setMessage("No se pudo registrar la llegada: " + error.message);
+    finishing = false;
   }
-
-  currentPlayer = data;
-
-  const { data: winnerData, error: winnerError } =
-    await supabaseClient.rpc("claim_race_winner", {
-      p_room_code: roomCode,
-      p_player_id: currentPlayer.id
-    });
-
-  if (winnerError) {
-    console.error(winnerError);
-    setMessage("No se pudo registrar al ganador: " + winnerError.message);
-    return;
-  }
-
-  roomData = {
-    ...roomData,
-    ...winnerData
-  };
-
-  roomStatus = "finished";
-  verticalVelocity = 0;
-
-  await loadRoom();
-
-  setMessage("¡La carrera terminó!");
 }
 
 async function finishByTimeout() {
@@ -978,6 +1059,7 @@ async function finishByTimeout() {
     return;
   }
 
+  pressedKeys.clear();
   await loadRoom();
 }
 
@@ -1021,14 +1103,24 @@ function renderFinalResult() {
   }
 
   overlay.hidden = false;
+  overlay.replaceChildren();
 
-  overlay.innerHTML = `
-    <div class="winner-card">
-      <h1>${heading}</h1>
-      <p>${subtitle}</p>
-      <button id="playAgainButton">JUGAR OTRA VEZ</button>
-    </div>
-  `;
+  const card = document.createElement("div");
+  card.className = "winner-card";
+
+  const title = document.createElement("h1");
+  title.textContent = heading;
+
+  const paragraph = document.createElement("p");
+  paragraph.textContent = subtitle;
+
+  const button = document.createElement("button");
+  button.id = "playAgainButton";
+  button.textContent = "JUGAR OTRA VEZ";
+  button.addEventListener("click", restartGame);
+
+  card.append(title, paragraph, button);
+  overlay.appendChild(card);
 
   if ($("winnerMessage")) {
     $("winnerMessage").textContent = subtitle;
@@ -1037,14 +1129,17 @@ function renderFinalResult() {
   if ($("finalResult")) {
     $("finalResult").hidden = false;
   }
-
-  $("playAgainButton").addEventListener("click", restartGame);
 }
 
 // ---------------- TESOROS ----------------
 
 async function findTreasure() {
-  if (!currentPlayer || busy || roomStatus !== "racing") return;
+  if (
+    !currentPlayer ||
+    busy ||
+    roomStatus !== "racing" ||
+    currentPlayer.finished_at
+  ) return;
 
   const nearby = TREASURES.find(treasure => {
     const alreadyClaimed = roomClaims.some(
@@ -1120,6 +1215,8 @@ async function restartGame() {
   }
 
   busy = true;
+  pressedKeys.clear();
+  finishing = false;
 
   try {
     const { error: claimsError } = await supabaseClient
@@ -1159,6 +1256,8 @@ async function restartGame() {
     verticalVelocity = 0;
     isGrounded = true;
     lastFrameTime = 0;
+    lastSaveTime = 0;
+    lastMovementTime = 0;
 
     await loadRoom();
 
@@ -1180,6 +1279,7 @@ async function leaveGame() {
   if (!confirm("¿Seguro que quieres abandonar la isla?")) return;
 
   busy = true;
+  pressedKeys.clear();
 
   try {
     const playerId = currentPlayer.id;
@@ -1222,7 +1322,9 @@ async function leaveGame() {
 
     await loadRoom();
 
-    $("playerInfo").textContent = "Has salido de la isla.";
+    if ($("playerInfo")) {
+      $("playerInfo").textContent = "Has salido de la isla.";
+    }
 
     setStatus("Has salido de la isla");
     setMessage("Has abandonado la partida.");
@@ -1238,44 +1340,80 @@ async function leaveGame() {
 // ---------------- CONTROLES ----------------
 
 function setupControls() {
-  $("joinButton").addEventListener("click", joinIsland);
-  $("readyButton").addEventListener("click", markReady);
-  $("findTreasureButton").addEventListener("click", findTreasure);
-  $("restartButton").addEventListener("click", restartGame);
-  $("leaveButton").addEventListener("click", leaveGame);
+  if ($("joinButton")) {
+    $("joinButton").addEventListener("click", joinIsland);
+  }
 
+  if ($("readyButton")) {
+    $("readyButton").addEventListener("click", markReady);
+  }
+
+  if ($("findTreasureButton")) {
+    $("findTreasureButton").addEventListener("click", findTreasure);
+  }
+
+  if ($("restartButton")) {
+    $("restartButton").addEventListener("click", restartGame);
+  }
+
+  if ($("leaveButton")) {
+    $("leaveButton").addEventListener("click", leaveGame);
+  }
+
+  // Botones manuales: un movimiento por cada pulsación.
   document.querySelectorAll("[data-move]").forEach(button => {
     button.addEventListener("click", () => {
       movePlayer(button.dataset.move);
     });
   });
 
+  // Teclado: flechas y WASD.
   document.addEventListener("keydown", event => {
     if (
-      ["INPUT", "TEXTAREA"].includes(
+      ["INPUT", "TEXTAREA", "SELECT"].includes(
         document.activeElement?.tagName
       )
     ) {
       return;
     }
 
-    const keys = {
-      ArrowRight: "right",
-      ArrowLeft: "left",
-      ArrowUp: "up",
-      ArrowDown: "down",
-      " ": "up"
-    };
+    const validKeys = [
+      "ArrowRight",
+      "ArrowLeft",
+      "ArrowUp",
+      "ArrowDown",
+      "KeyD",
+      "KeyA",
+      "KeyW",
+      "KeyS",
+      "Space"
+    ];
 
-    const direction = keys[event.key];
+    if (!validKeys.includes(event.code)) return;
 
-    if (direction) {
-      event.preventDefault();
+    event.preventDefault();
 
-      if (!event.repeat || direction !== "up") {
-        movePlayer(direction);
-      }
+    // Evita saltos repetidos mientras se mantiene pulsada la tecla.
+    if (
+      (event.code === "ArrowUp" ||
+       event.code === "KeyW" ||
+       event.code === "Space") &&
+      !event.repeat
+    ) {
+      jumpPlayer();
+      return;
     }
+
+    pressedKeys.add(event.code);
+  });
+
+  document.addEventListener("keyup", event => {
+    pressedKeys.delete(event.code);
+  });
+
+  // Evita que una tecla quede activada al cambiar de ventana.
+  window.addEventListener("blur", () => {
+    pressedKeys.clear();
   });
 }
 
