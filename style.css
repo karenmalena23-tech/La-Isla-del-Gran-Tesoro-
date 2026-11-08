@@ -44,13 +44,12 @@ button:hover { filter: brightness(1.15); }
 }
 .pirate {
   position: absolute; bottom: 55px; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #fff;
-  display: grid; place-items: center; font-size: 24px; z-index: 6; transform: translateX(-50%); transition: left 0.05s linear, bottom 0.1s ease-out;
+  display: grid; place-items: center; font-size: 24px; z-index: 6; transform: translateX(-50%); transition: left 0.05s linear, bottom 0.08s ease-out;
 }
 .pirate.red { background: #d84b42; }
 .pirate.blue { background: #347ed0; }
 .p-tag { position: absolute; top: -18px; background: #0008; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 4px; }
 
-/* CONTROLES TÁCTILES PARA CELULAR */
 .touch-controls {
   display: flex;
   justify-content: center;
@@ -70,7 +69,6 @@ button:hover { filter: brightness(1.15); }
 .control-btn.jump { background: #c68a30; color: #1a1204; }
 .control-btn:active { background: #d5a84d; color: #000; }
 
-/* TABLA DEL MARCADOR GLOBAL */
 .table-container { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #0d231e; border-radius: 8px; overflow: hidden; }
 th, td { padding: 12px; text-align: left; border-bottom: 1px solid #28574a; font-size: 14px; }
