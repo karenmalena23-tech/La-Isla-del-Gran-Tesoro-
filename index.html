@@ -3,41 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>La Isla del Tesoro - 2 Jugadores</title>
+  <title>La Isla del Tesoro - Multijugador Realtime</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
   <header>
     <div>
       <span class="eyebrow">ISLA DEL TESORO</span>
-      <h1>🏝️ Carrera Pirata Realtime</h1>
+      <h1>🏝️ Carrera Pirata en Red</h1>
     </div>
-    <div id="connectionStatus">🟢 Sistema Activo</div>
+    <div id="connectionStatus">🔴 Desconectado</div>
   </header>
 
   <main>
-    <!-- 1. AUTENTICACIÓN CON CORREO -->
+    <!-- FASE 1: AUTENTICACIÓN -->
     <section id="authSection" class="panel">
-      <h2>1. Iniciar Sesión / Registro</h2>
-      <p>Ingresa tu correo para registrar tus victorias.</p>
+      <h2>1. Cuenta de Pirata</h2>
+      <p>Inicia sesión o regístrate para entrar a las salas y registrar tus victorias.</p>
       <div class="fields">
-        <input type="email" id="emailInput" placeholder="Correo electrónico" value="karen@usfq.edu.ec" />
-        <input type="password" id="passwordInput" placeholder="Contraseña" value="123456" />
+        <input type="email" id="emailInput" placeholder="Correo electrónico" required />
+        <input type="password" id="passwordInput" placeholder="Contraseña" required />
         <button id="loginBtn" class="gold">Iniciar Sesión</button>
         <button id="signupBtn">Registrarse</button>
       </div>
       <p id="authStatus" class="status-msg"></p>
     </section>
 
-    <!-- 2. CONFIGURACIÓN DE SALA -->
+    <!-- FASE 2: SALA Y NOMBRE -->
     <section id="lobbySection" class="panel" hidden>
-      <h2>2. Configuración de Sala</h2>
+      <h2>2. Sala de Espera</h2>
       <p id="userWelcome"></p>
       <div class="room-setup">
-        <label>Nombre de Pirata: <input type="text" id="playerNameInput" value="Karen" /></label>
+        <label>Tu Nombre de Pirata: <input type="text" id="playerNameInput" placeholder="Ej: Capitán Jack" /></label>
         <label>Código de la Isla: <input type="text" id="roomCodeInput" value="ISLA1" /></label>
-        <button id="joinRoomBtn" class="gold">Entrar a la Isla</button>
+        <button id="joinRoomBtn" class="gold">Conectarse a la Isla</button>
       </div>
 
       <div id="roomLobby" hidden class="room-lobby">
@@ -45,14 +46,12 @@
         <h3>Isla: <span id="currentRoomCode">ISLA1</span></h3>
         <div class="players-status-grid">
           <div class="player-card red">
-            <h4>🔴 Pirata 1 (Tú)</h4>
-            <p id="p1Name">Karen</p>
-            <p id="p1Status" class="badge">No listo</p>
+            <h4>🔴 Pirata 1</h4>
+            <p id="p1Info">Esperando...</p>
           </div>
           <div class="player-card blue">
-            <h4>🔵 Pirata 2 (Rival)</h4>
-            <p id="p2Name">Bot Rival</p>
-            <p id="p2Status" class="badge">Listo 🟢</p>
+            <h4>🔵 Pirata 2</h4>
+            <p id="p2Info">Esperando...</p>
           </div>
         </div>
         <button id="readyBtn" class="gold-btn">¡Estoy Listo!</button>
@@ -60,10 +59,10 @@
       <div id="countdownDisplay" class="countdown" hidden>5</div>
     </section>
 
-    <!-- 3. ESCENARIO DE JUEGO -->
+    <!-- FASE 3: ESCENARIO DE JUEGO Y CONTROLES TÁCTILES -->
     <section id="gameSection" class="panel" hidden>
       <div class="game-header">
-        <div class="timer">⏱️ Tiempo Restante: <span id="timerDisplay">02:30</span></div>
+        <div class="timer">⏱️ Tiempo: <span id="timerDisplay">02:30</span></div>
         <div class="scoreboard">🏆 Tus Victorias: <span id="userWinsCount">0</span></div>
       </div>
 
@@ -74,32 +73,59 @@
           <div class="hill hill-3"></div>
           <div id="obstaclesLayer"></div>
           <div id="chestsLayer"></div>
-          <div id="pirate1" class="pirate red">🏴‍☠️<span class="p-tag">P1</span></div>
-          <div id="pirate2" class="pirate blue">🦜<span class="p-tag">P2</span></div>
+          <div id="pirate1" class="pirate red">🏴‍☠️<span class="p-tag" id="tagP1">P1</span></div>
+          <div id="pirate2" class="pirate blue">🦜<span class="p-tag" id="tagP2">P2</span></div>
           <div id="finishFlag">🏁 META 🏆</div>
           <div class="ground-dirt"></div>
         </div>
       </div>
-      <p class="controls-hint">Controles: Usa <strong>A / D</strong> o <strong>Flechas ⬅️ ➡️</strong> para moverte | <strong>W / Espacio / Flecha ⬆️</strong> para saltar.</p>
+
+      <!-- BOTONES TÁCTILES PARA CELULAR / TABLET Y PC -->
+      <div class="touch-controls">
+        <button id="leftBtn" class="control-btn">⬅️ Izquierda</button>
+        <button id="jumpBtn" class="control-btn jump">⬆️ Saltar</button>
+        <button id="rightBtn" class="control-btn">Derecha ➡️</button>
+      </div>
+
+      <p class="controls-hint">Usa las teclas <strong>A / D</strong> o los botones táctiles en pantalla para moverte y saltar.</p>
     </section>
 
-    <!-- MODALES DE RESULTADO -->
+    <!-- MARCADOR GLOBAL EN VIVO -->
+    <section id="scoreboardSection" class="panel">
+      <h2>📜 Salón de la Fama (Marcador Global)</h2>
+      <div class="table-container">
+        <table id="globalScoreboard">
+          <thead>
+            <tr>
+              <th>Pirata</th>
+              <th>Victoria Registrada</th>
+              <th>Total Victorias</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboardBody">
+            <tr><td colspan="3" style="text-align:center;">Cargando historial...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MODALES -->
     <div id="winOverlay" class="modal win-modal" hidden>
       <h2>🏆 ¡VICTORIA PIRATA!</h2>
-      <p id="winMessage">¡Has llegado primero a la meta y conquistado el tesoro!</p>
-      <button onclick="location.reload()" class="gold">Volver a Jugar</button>
+      <p id="winMessage">¡Has conquistado el tesoro y quedado registrado en la historia!</p>
+      <button onclick="location.reload()" class="gold">Volver al Inicio</button>
     </div>
 
     <div id="loseOverlay" class="modal lose-modal" hidden>
       <h2>☠️ ¡DERROTA!</h2>
-      <p id="loseMessage">El rival ha tomado el tesoro antes que tú.</p>
-      <button onclick="location.reload()" class="gold">Reintentar</button>
+      <p>El rival llegó primero a la meta.</p>
+      <button onclick="location.reload()" class="gold">Volver al Inicio</button>
     </div>
 
     <div id="timeOutOverlay" class="modal timeout-modal" hidden>
       <h2>⏰ ¡TIEMPO AGOTADO!</h2>
-      <p>Se acabaron los 2 minutos y medio. Ambos piratas cayeron en la marea.</p>
-      <button onclick="location.reload()" class="gold">Volver a Intentar</button>
+      <p>Los 2 minutos y medio expiraron para ambos piratas.</p>
+      <button onclick="location.reload()" class="gold">Volver al Inicio</button>
     </div>
   </main>
 
