@@ -85,8 +85,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   line-height: 1.5;
 }
 
-#loggedInArea { margin-top: 12px; }
-
 .ready-grid,
 .score-grid {
   display: grid;
@@ -103,7 +101,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .red { background: #673b3b; }
 .blue { background: #294d70; }
-.score-grid p { font-size: 28px; font-weight: bold; }
+.score-grid p { font-size: 28px; font-weight: bold; margin: 5px 0; }
 #readyButton { min-width: 190px; }
 
 .countdown {
@@ -111,6 +109,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   color: #f4ca70;
   font-weight: bold;
   margin: 15px;
+  text-align: center;
 }
 
 .game-heading {
@@ -149,11 +148,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   will-change: transform;
 }
 
-/* DECORACIÓN DEL FONDO */
+/* ÁRBOLES DE FONDO EN EL CIELO */
 .scenery {
   position: absolute;
   z-index: 1;
-  top: 35px;
+  top: 15px;
   left: 30px;
   width: 4000px;
   font-size: 42px;
@@ -161,7 +160,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   pointer-events: none;
 }
 
-/* SUELO */
+/* SUELO DE LA PISTA */
 .ground {
   position: absolute;
   z-index: 2;
@@ -178,11 +177,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   border-top: 4px solid #b2d76b;
 }
 
-/* OBSTÁCULOS (Corregido para que no floten) */
+/* OBSTÁCULOS ANCLADOS AL PISO */
 .obstacle {
   position: absolute;
   z-index: 4;
-  bottom: 5px;
+  bottom: 55px;
   width: 52px;
   height: 58px;
   display: flex;
@@ -196,11 +195,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   pointer-events: none;
 }
 
-/* COFRES (Corregido para que no floten) */
+/* COFRES ANCLADOS AL PISO */
 .chest {
   position: absolute;
   z-index: 4;
-  bottom: 5px;
+  bottom: 55px;
   width: 46px;
   height: 48px;
   display: grid;
@@ -241,7 +240,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   border-radius: 50%;
   font-size: 30px;
   transform: translateX(-50%);
-  transition: left .12s,bottom .12s;
+  transition: left .12s, bottom .12s;
 }
 
 .pirate.red { background: #d84b42; }
@@ -272,8 +271,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   border: 2px solid #d5a84d;
   font-size: 20px;
 }
-
-li { margin: 8px 0; color: #d8e9d9; }
 
 footer {
   text-align: center;
