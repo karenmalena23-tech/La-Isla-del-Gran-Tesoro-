@@ -1,7 +1,5 @@
-
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
-
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const WORLD_WIDTH = 4200;
@@ -51,10 +49,11 @@ let lastPositionSave = 0;
 let busy = false;
 let finishing = false;
 let savingResult = false;
+let changingCountdown = false;
 let lastSavedRace = "";
 
 // --------------------------------------------------
-// MENSAJES
+// MENSAJES Y UTILIDADES
 // --------------------------------------------------
 
 function message(text) {
@@ -66,7 +65,9 @@ function playerMessage(text) {
 }
 
 function status(text) {
-  $("connectionStatus").textContent = text;
+  if ($("connectionStatus")) {
+    $("connectionStatus").textContent = text;
+  }
 }
 
 function authMessage(text) {
@@ -81,6 +82,10 @@ function getStartPosition(role) {
   return role === "red" ? 140 : 200;
 }
 
+function getPlayerById(id) {
+  return players.find((p) => p.id === id);
+}
+
 // --------------------------------------------------
 // AUTENTICACIÓN
 // --------------------------------------------------
@@ -93,7 +98,6 @@ async function refreshAuthUI() {
   $("passwordInput").disabled = logged;
   $("signUpButton").hidden = logged;
   $("loginButton").hidden = logged;
-
   $("accountEmail").textContent = currentUser?.email || "";
 
   if (logged) {
@@ -103,8 +107,11 @@ async function refreshAuthUI() {
   } else {
     authMessage("Inicia sesión para jugar.");
     $("totalWins").textContent = "0";
-    $("historyList").innerHTML = "<li>Inicia sesión para ver tus victorias.</li>";
-    $("matchHistoryList").innerHTML = "<li>Inicia sesión para ver las carreras.</li>";
+    $("historyList").innerHTML =
+      "<li>Inicia sesión para ver tus victorias.</li>";
+    $("matchHistoryList").innerHTML =
+      "<li>Inicia sesión para ver las carreras.</li>";
+    renderLeaderboard([]);
   }
 }
 
@@ -133,7 +140,9 @@ async function register() {
       await refreshAuthUI();
       authMessage("¡Cuenta creada correctamente!");
     } else {
-      authMessage("Cuenta creada. Revisa tu correo para confirmar el registro.");
+      authMessage(
+        "Cuenta creada. Revisa tu correo para confirmar el registro."
+      );
     }
   } catch (error) {
     authMessage("Error al crear la cuenta: " + error.message);
@@ -203,7 +212,7 @@ async function initAuth() {
 }
 
 // --------------------------------------------------
-// HISTORIAL PERSONAL
+// HISTORIAL PERSONAL DE VICTORIAS
 // --------------------------------------------------
 
 async function loadWinHistory() {
@@ -217,8 +226,9 @@ async function loadWinHistory() {
     .limit(30);
 
   if (error) {
-    console.error(error);
-    $("historyList").innerHTML = "<li>No se pudo cargar el historial.</li>";
+    console.error("Error cargando victorias:", error);
+    $("historyList").innerHTML =
+      "<li>No se pudo cargar el historial.</li>";
     return;
   }
 
@@ -240,7 +250,7 @@ async function loadWinHistory() {
 }
 
 // --------------------------------------------------
-// HISTORIAL COMPARTIDO
+// HISTORIAL Y TABLA COMPARTIDA
 // --------------------------------------------------
 
 async function loadMatchHistory() {
@@ -249,18 +259,19 @@ async function loadMatchHistory() {
   const { data, error } = await db
     .from("treasure_match_history")
     .select(
-      "room_code, red_player_name, blue_player_name, winner_name, winner_role, finished_at"
+      "room_code, red_player_name, blue_player_name, red_user_id, blue_user_id, winner_name, winner_role, finished_at"
     )
     .or(
       `red_user_id.eq.${currentUser.id},blue_user_id.eq.${currentUser.id}`
     )
     .order("finished_at", { ascending: false })
-    .limit(30);
+    .limit(100);
 
   if (error) {
-    console.error(error);
+    console.error("Error cargando carreras:", error);
     $("matchHistoryList").innerHTML =
       "<li>No se pudo cargar el historial compartido.</li>";
+    renderLeaderboard([]);
     return;
   }
 
@@ -269,16 +280,52 @@ async function loadMatchHistory() {
   if (!data.length) {
     $("matchHistoryList").innerHTML =
       "<li>Aún no hay carreras registradas.</li>";
+  } else {
+    data.forEach((match) => {
+      const li = document.createElement("li");
+
+      li.textContent =
+        `🏆 Ganó ${match.winner_name} (${match.winner_role}). ` +
+        `Participaron ${match.red_player_name} y ${match.blue_player_name}. ` +
+        `Isla: ${match.room_code}.`;
+
+      $("matchHistoryList").appendChild(li);
+    });
+  }
+
+  renderLeaderboard(data);
+}
+
+function renderLeaderboard(matches) {
+  const list = $("leaderboardList");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  const totals = {};
+
+  matches.forEach((match) => {
+    if (!match.winner_name) return;
+
+    const name = match.winner_name;
+    totals[name] = (totals[name] || 0) + 1;
+  });
+
+  const ranking = Object.entries(totals)
+    .map(([name, wins]) => ({ name, wins }))
+    .sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
+
+  if (!ranking.length) {
+    list.innerHTML = "<li>El marcador aparecerá cuando termine una carrera.</li>";
     return;
   }
 
-  data.forEach((match) => {
+  ranking.forEach((item, index) => {
     const li = document.createElement("li");
     li.textContent =
-      `🏆 Ganó ${match.winner_name} (${match.winner_role}). ` +
-      `Participaron ${match.red_player_name} y ${match.blue_player_name}. ` +
-      `Isla: ${match.room_code}.`;
-    $("matchHistoryList").appendChild(li);
+      `${index + 1}. ${item.name} — ${item.wins} ` +
+      (item.wins === 1 ? "victoria" : "victorias");
+    list.appendChild(li);
   });
 }
 
@@ -312,7 +359,8 @@ async function saveMatchResult() {
         winner_player_id: currentPlayer.id,
         winner_user_id: currentUser.id,
         winner_name: currentPlayer.player_name,
-        winner_role: currentPlayer.role
+        winner_role: currentPlayer.role,
+        finished_at: new Date().toISOString()
       });
 
     if (error && error.code !== "23505") throw error;
@@ -325,20 +373,24 @@ async function saveMatchResult() {
         player_name: currentPlayer.player_name
       });
 
-    if (winError) console.error("Error guardando victoria personal:", winError);
+    if (winError && winError.code !== "23505") {
+      console.error("Error guardando victoria personal:", winError);
+    }
 
     lastSavedRace = raceKey;
+
     await loadWinHistory();
     await loadMatchHistory();
   } catch (error) {
     console.error("Error guardando resultado:", error);
+    message("La carrera terminó, pero hubo un error guardando el marcador.");
   } finally {
     savingResult = false;
   }
 }
 
 // --------------------------------------------------
-// SALA
+// SALAS
 // --------------------------------------------------
 
 async function ensureRoom(code) {
@@ -404,14 +456,20 @@ async function loadRoom() {
   room = roomResult.data;
 
   if (currentPlayer) {
-    currentPlayer = players.find((p) => p.id === currentPlayer.id) || currentPlayer;
+    currentPlayer =
+      players.find((p) => p.id === currentPlayer.id) || currentPlayer;
   }
 
   drawPlayers();
   drawWaitingRoom();
   drawResult();
   updateTimer();
+  updateCamera();
 }
+
+// --------------------------------------------------
+// DIBUJAR JUGADORES Y SALA DE ESPERA
+// --------------------------------------------------
 
 function drawPlayers() {
   const red = players.find((p) => p.role === "red");
@@ -435,10 +493,14 @@ function drawPlayers() {
 
   players.forEach((p) => {
     const li = document.createElement("li");
+
+    let state = "Esperando";
+    if (p.finished_at) state = "Llegó a la meta";
+    else if (p.is_ready) state = "Está listo";
+
     li.textContent =
-      `${p.role === "red" ? "🔴" : "🔵"} ${p.player_name}: ` +
-      (p.finished_at ? "Llegó a la meta" :
-        p.is_ready ? "Está listo" : "Esperando");
+      `${p.role === "red" ? "🔴" : "🔵"} ${p.player_name}: ${state}`;
+
     list.appendChild(li);
   });
 }
@@ -463,7 +525,8 @@ function drawWaitingRoom() {
   $("readyButton").disabled =
     !currentPlayer ||
     room?.status !== "waiting" ||
-    Boolean(currentPlayer.is_ready);
+    Boolean(currentPlayer.is_ready) ||
+    players.length !== 2;
 
   if (!room) return;
 
@@ -485,7 +548,7 @@ function drawWaitingRoom() {
 // --------------------------------------------------
 
 function drawPirate(element, player) {
-  if (!player) {
+  if (!player || player.x === null || player.y === null) {
     element.style.display = "none";
     return;
   }
@@ -498,8 +561,7 @@ function drawPirate(element, player) {
 function buildWorld() {
   $("world").style.width = WORLD_WIDTH + "px";
 
-  const finish = $("finishLine");
-  finish.style.left = FINISH_X + "px";
+  $("finishLine").style.left = FINISH_X + "px";
 
   const obstacleArea = $("obstacleArea");
   obstacleArea.innerHTML = "";
@@ -530,6 +592,7 @@ function updateCamera() {
   if (!currentPlayer) return;
 
   const viewportWidth = $("island").clientWidth;
+
   const camera = Math.max(
     0,
     Math.min(
@@ -542,7 +605,7 @@ function updateCamera() {
 }
 
 // --------------------------------------------------
-// ENTRAR A LA ISLA Y ASIGNAR COLOR
+// ENTRAR A LA ISLA
 // --------------------------------------------------
 
 async function joinIsland() {
@@ -574,7 +637,9 @@ async function joinIsland() {
     }
 
     roomCode = code;
-    await ensureRoom(roomCode);
+
+    // Corrección importante: guardar la sala en la variable global.
+    room = await ensureRoom(roomCode);
 
     const { data: existing, error: existingError } = await db
       .from("treasure_players")
@@ -657,11 +722,16 @@ async function joinIsland() {
 }
 
 // --------------------------------------------------
-// BOTÓN ESTOY LISTO
+// ESTOY LISTO
 // --------------------------------------------------
 
 async function markReady() {
   if (!currentPlayer || !roomCode || room?.status !== "waiting") return;
+
+  if (players.length !== 2) {
+    message("Se necesitan dos jugadores para comenzar.");
+    return;
+  }
 
   $("readyButton").disabled = true;
 
@@ -675,9 +745,7 @@ async function markReady() {
     if (error) throw error;
 
     await loadRoom();
-
     message("¡Estás listo! Esperando al otro capitán.");
-
   } catch (error) {
     console.error(error);
     message("No se pudo marcar como listo: " + error.message);
@@ -686,15 +754,31 @@ async function markReady() {
 }
 
 // --------------------------------------------------
-// CUENTA REGRESIVA
+// CUENTA ATRÁS DE 5 SEGUNDOS
 // --------------------------------------------------
 
 async function checkCountdown() {
-  if (!room || room.status !== "countdown" || !room.started_at) return;
+  if (
+    !room ||
+    room.status !== "countdown" ||
+    !room.started_at ||
+    changingCountdown
+  ) return;
 
   const startTime = new Date(room.started_at).getTime();
+  const remainingMs = startTime - Date.now();
 
-  if (Date.now() >= startTime) {
+  if (remainingMs > 0) {
+    $("countdownDisplay").hidden = false;
+    $("countdownDisplay").textContent =
+      Math.ceil(remainingMs / 1000);
+    return;
+  }
+
+  changingCountdown = true;
+
+  try {
+    const countdownStart = room.started_at;
     const actualStart = new Date().toISOString();
 
     const { error } = await db
@@ -705,16 +789,18 @@ async function checkCountdown() {
       })
       .eq("room_code", roomCode)
       .eq("status", "countdown")
-      .eq("started_at", room.started_at);
+      .eq("started_at", countdownStart);
 
-    if (error) console.error(error);
+    if (error) throw error;
 
     await loadRoom();
+
+    $("countdownDisplay").hidden = true;
     message("¡COMIENZA LA CARRERA!");
-  } else {
-    const seconds = Math.ceil((startTime - Date.now()) / 1000);
-    $("countdownDisplay").hidden = false;
-    $("countdownDisplay").textContent = seconds;
+  } catch (error) {
+    console.error("Error iniciando carrera:", error);
+  } finally {
+    changingCountdown = false;
   }
 }
 
@@ -783,7 +869,9 @@ function movePlayer(delta) {
   currentPlayer.x = x;
   currentPlayer.y = y;
 
-  const element = currentPlayer.role === "red" ? $("pirateA") : $("pirateB");
+  const element =
+    currentPlayer.role === "red" ? $("pirateA") : $("pirateB");
+
   drawPirate(element, currentPlayer);
   updateCamera();
 
@@ -832,7 +920,7 @@ function startLoop() {
 }
 
 // --------------------------------------------------
-// FINALIZAR CARRERA
+// GANADOR Y RESULTADOS
 // --------------------------------------------------
 
 async function finishRace() {
@@ -864,7 +952,6 @@ async function finishRace() {
     await loadRoom();
     await saveMatchResult();
     drawResult();
-
   } catch (error) {
     console.error(error);
     message("Error al guardar el ganador: " + error.message);
@@ -883,24 +970,27 @@ function drawResult() {
 
   if (!room.winner_player_id) {
     $("winnerMessage").textContent =
-      "Se terminó el tiempo. La carrera terminó sin ganador.";
+      "⏰ Lo sentimos, se acabó el tiempo. ¡Has perdido!";
+    message("Se acabaron los cinco minutos. La carrera terminó sin ganador.");
     return;
   }
 
-  const winner = players.find((p) => p.id === room.winner_player_id);
+  const winner = getPlayerById(room.winner_player_id);
   const winnerName = room.winner_name || winner?.player_name || "Un jugador";
 
   if (currentPlayer?.id === room.winner_player_id) {
-    $("winnerMessage").textContent = "🎉 ¡FELICIDADES! ¡GANASTE LA CARRERA!";
+    $("winnerMessage").textContent =
+      "🎉 ¡FELICIDADES! ¡GANASTE LA CARRERA!";
     message("¡Ganaste! Eres el gran capitán del tesoro.");
   } else {
-    $("winnerMessage").textContent = `🏆 El ganador es ${winnerName}.`;
+    $("winnerMessage").textContent =
+      `😔 Lo sentimos, has perdido. El ganador es ${winnerName}.`;
     message(`La carrera terminó. Ganó ${winnerName}.`);
   }
 }
 
 // --------------------------------------------------
-// TEMPORIZADOR
+// TEMPORIZADOR DE CINCO MINUTOS
 // --------------------------------------------------
 
 function updateTimer() {
@@ -919,9 +1009,10 @@ function updateTimer() {
 
   if (room.status !== "racing") return;
 
-  const elapsed = (Date.now() - new Date(room.started_at).getTime()) / 1000;
-  const remaining = Math.max(0, Math.ceil(GAME_SECONDS - elapsed));
+  const elapsed =
+    (Date.now() - new Date(room.started_at).getTime()) / 1000;
 
+  const remaining = Math.max(0, Math.ceil(GAME_SECONDS - elapsed));
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
 
@@ -939,14 +1030,15 @@ async function finishByTime() {
       .from("treasure_rooms")
       .update({ status: "finished" })
       .eq("room_code", roomCode)
-      .eq("status", "racing");
+      .eq("status", "racing")
+      .is("winner_player_id", null);
 
     if (error) throw error;
 
     await loadRoom();
     drawResult();
   } catch (error) {
-    console.error(error);
+    console.error("Error finalizando por tiempo:", error);
   }
 }
 
@@ -961,11 +1053,11 @@ function startTimer() {
     }
 
     updateTimer();
-  }, 500);
+  }, 250);
 }
 
 // --------------------------------------------------
-// ACTUALIZACIÓN MULTIJUGADOR
+// ACTUALIZACIÓN EN LOS DOS DISPOSITIVOS
 // --------------------------------------------------
 
 function connectRealtime() {
@@ -976,6 +1068,7 @@ function connectRealtime() {
 
   channel = db
     .channel("isla-" + roomCode)
+
     .on(
       "postgres_changes",
       {
@@ -986,16 +1079,18 @@ function connectRealtime() {
       },
       async (payload) => {
         try {
-          await loadRoom();
+          // Evita recargar la posición propia continuamente.
+          const changedId = payload.new?.id || payload.old?.id;
 
-          if (payload.new?.id === currentPlayer?.id) {
-            currentPlayer = players.find((p) => p.id === currentPlayer.id) || currentPlayer;
-          }
+          if (changedId === currentPlayer?.id) return;
+
+          await loadRoom();
         } catch (error) {
           console.error(error);
         }
       }
     )
+
     .on(
       "postgres_changes",
       {
@@ -1007,11 +1102,33 @@ function connectRealtime() {
       async () => {
         try {
           await loadRoom();
+
+          if (room?.status === "finished") {
+            await loadMatchHistory();
+            drawResult();
+          }
         } catch (error) {
           console.error(error);
         }
       }
     )
+
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "treasure_match_history"
+      },
+      async () => {
+        try {
+          await loadMatchHistory();
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    )
+
     .subscribe((state) => {
       if (state === "SUBSCRIBED") {
         status("Multijugador conectado");
@@ -1020,7 +1137,7 @@ function connectRealtime() {
 }
 
 // --------------------------------------------------
-// REINICIAR Y SALIR
+// REINICIAR PARTIDA
 // --------------------------------------------------
 
 async function restartGame() {
@@ -1042,7 +1159,6 @@ async function restartGame() {
 
     if (playerError) throw playerError;
 
-    // Restablecer cada posición según el color.
     for (const p of players) {
       const { error } = await db
         .from("treasure_players")
@@ -1070,11 +1186,14 @@ async function restartGame() {
 
     velocityY = 0;
     grounded = true;
+    finishing = false;
     lastSavedRace = "";
 
     await loadRoom();
+
     $("finalResult").hidden = true;
     $("timerDisplay").textContent = "05:00";
+    $("countdownDisplay").hidden = true;
 
     message("Partida reiniciada. Los dos jugadores deben volver a estar listos.");
   } catch (error) {
@@ -1082,6 +1201,10 @@ async function restartGame() {
     console.error(error);
   }
 }
+
+// --------------------------------------------------
+// SALIR DE LA ISLA
+// --------------------------------------------------
 
 async function leaveIsland(showText = true) {
   if (!currentPlayer) return;
@@ -1102,16 +1225,31 @@ async function leaveIsland(showText = true) {
 
     if (error) throw error;
 
-    await db
-      .from("treasure_rooms")
-      .update({
-        status: "waiting",
-        started_at: null,
-        winner_player_id: null,
-        winner_name: null,
-        winner_role: null
-      })
+    const { data: remainingPlayers, error: remainingError } = await db
+      .from("treasure_players")
+      .select("id")
       .eq("room_code", roomCode);
+
+    if (remainingError) throw remainingError;
+
+    // Si queda un jugador, la sala vuelve a espera y debe marcarse listo otra vez.
+    if (remainingPlayers.length < 2) {
+      await db
+        .from("treasure_players")
+        .update({ is_ready: false, finished_at: null })
+        .eq("room_code", roomCode);
+
+      await db
+        .from("treasure_rooms")
+        .update({
+          status: "waiting",
+          started_at: null,
+          winner_player_id: null,
+          winner_name: null,
+          winner_role: null
+        })
+        .eq("room_code", roomCode);
+    }
 
     currentPlayer = null;
     players = [];
@@ -1139,7 +1277,7 @@ async function leaveIsland(showText = true) {
 }
 
 // --------------------------------------------------
-// CONTROLES DEL JUEGO
+// CONTROLES
 // --------------------------------------------------
 
 function setupControls() {
@@ -1153,9 +1291,14 @@ function setupControls() {
   $("leaveButton").addEventListener("click", () => leaveIsland(true));
 
   window.addEventListener("keydown", (event) => {
-    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const key = event.key.length === 1
+      ? event.key.toLowerCase()
+      : event.key;
 
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) {
+    if (
+      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "]
+        .includes(event.key)
+    ) {
       event.preventDefault();
     }
 
@@ -1167,7 +1310,10 @@ function setupControls() {
   });
 
   window.addEventListener("keyup", (event) => {
-    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const key = event.key.length === 1
+      ? event.key.toLowerCase()
+      : event.key;
+
     keys.delete(key);
   });
 
@@ -1196,14 +1342,13 @@ function setupControls() {
 }
 
 // --------------------------------------------------
-// INICIO
+// INICIAR APLICACIÓN
 // --------------------------------------------------
 
 async function startApplication() {
   buildWorld();
   setupControls();
 
-  // Los dos piratas empiezan ocultos hasta que entren los jugadores.
   $("pirateA").style.display = "none";
   $("pirateB").style.display = "none";
   $("waitingRoom").hidden = true;
