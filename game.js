@@ -470,8 +470,8 @@ async function loadRoom() {
 // --------------------------------------------------
 // DIBUJAR JUGADORES Y SALA DE ESPERA
 // --------------------------------------------------
-function drawPirate(element, player) {
-  function drawPlayers() {
+
+function drawPlayers() {
   const red = players.find(p => p.role === "red");
   const blue = players.find(p => p.role === "blue");
 
@@ -523,17 +523,18 @@ function drawWaitingRoom() {
       : "Los dos jugadores deben pulsar ¡Estoy listo!";
   }
 }
+
+function drawPirate(element, player) {
   if (!player) {
     element.style.display = "none";
     return;
   }
 
-  // Recuperar posición si estaba vacía en Supabase
-  if (player.x === null || player.x === undefined) {
+  if (player.x == null) {
     player.x = getStartPosition(player.role);
   }
 
-  if (player.y === null || player.y === undefined) {
+  if (player.y == null) {
     player.y = GROUND_TOP - PLAYER_HEIGHT / 2;
   }
 
@@ -541,7 +542,6 @@ function drawWaitingRoom() {
   element.style.left = `${Number(player.x)}px`;
   element.style.top = `${Number(player.y)}px`;
 
-  // Mostrar el nombre encima del pirata
   let nameLabel = element.querySelector(".pirate-name");
 
   if (!nameLabel) {
