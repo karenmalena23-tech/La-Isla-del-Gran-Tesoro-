@@ -1,3 +1,7 @@
+const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
+const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
 const authSection = document.getElementById('authSection');
 const lobbySection = document.getElementById('lobbySection');
 const gameSection = document.getElementById('gameSection');
@@ -6,7 +10,8 @@ const connectionStatus = document.getElementById('connectionStatus');
 const userWelcome = document.getElementById('userWelcome');
 const currentRoomCode = document.getElementById('currentRoomCode');
 const roomLobby = document.getElementById('roomLobby');
-const p1Status = document.getElementById('p1Status');
+const p1Info = document.getElementById('p1Info');
+const p2Info = document.getElementById('p2Info');
 const readyBtn = document.getElementById('readyBtn');
 const countdownDisplay = document.getElementById('countdownDisplay');
 const timerDisplay = document.getElementById('timerDisplay');
@@ -17,57 +22,156 @@ const pirate2 = document.getElementById('pirate2');
 const winOverlay = document.getElementById('winOverlay');
 const loseOverlay = document.getElementById('loseOverlay');
 const timeOutOverlay = document.getElementById('timeOutOverlay');
+const scoreboardBody = document.getElementById('scoreboardBody');
 
-let currentUserEmail = "";
+let currentUser = null;
+let playerName = "Pirata";
 let currentWins = 0;
+let roomChannel = null;
+let roomCode = 'ISLA1';
+let myRole = null; 
 let isReady = false;
 let gameState = 'idle';
 
 let posX1 = 100, posY1 = 0, isJumping1 = false;
-let posX2 = 140, posY2 = 0;
-let timeLeft = 150; // 2 min y medio (150s)
+let posX2 = 100, posY2 = 0;
+let timeLeft = 150; 
 let timerInterval = null;
-let botInterval = null;
 
-const obstacles = [500, 1100, 1600, 2200, 2700, 3300, 3700];
-const chests = [350, 900, 1400, 2000, 2500, 3100, 3600];
+const obstacles = [400, 950, 1400, 1900, 2450, 2900, 3450, 3800];
+const chests = [300, 800, 1250, 1750, 2200, 2750, 3200, 3650];
 let collectedChests = new Set();
 
-document.getElementById('loginBtn').addEventListener('click', () => handleAuth());
-document.getElementById('signupBtn').addEventListener('click', () => handleAuth());
+document.getElementById('loginBtn').addEventListener('click', () => handleAuth('login'));
+document.getElementById('signupBtn').addEventListener('click', () => handleAuth('signup'));
 
-function handleAuth() {
+async function handleAuth(type) {
   const email = document.getElementById('emailInput').value.trim();
   const password = document.getElementById('passwordInput').value.trim();
 
   if (!email || !password) {
-    authStatus.textContent = "Por favor ingresa correo y contraseña.";
+    authStatus.textContent = "Ingresa correo y contraseña.";
     return;
   }
 
-  currentUserEmail = email;
-  connectionStatus.textContent = "🟢 Conectado: " + email;
-  authSection.hidden = true;
-  lobbySection.hidden = false;
-  userWelcome.textContent = `Bienvenido Capitán: ${email}`;
+  authStatus.textContent = "Conectando...";
+  let res;
+  if (type === 'signup') {
+    res = await supabaseClient.auth.signUp({ email, password });
+  } else {
+    res = await supabaseClient.auth.signInWithPassword({ email, password });
+  }
 
-  currentWins = parseInt(localStorage.getItem('wins_' + email) || '0');
+  if (res.error) {
+    authStatus.textContent = "Error: " + res.error.message;
+  } else {
+    currentUser = res.data.user;
+    connectionStatus.textContent = "🟢 Conectado";
+    authSection.hidden = true;
+    lobbySection.hidden = false;
+    userWelcome.textContent = `Cuenta: ${currentUser.email}`;
+    await loadWinsAndScoreboard();
+  }
+}
+
+async function loadWinsAndScoreboard() {
+  // Cargar victorias personales
+  const { data } = await supabaseClient.from('profiles').select('wins').eq('id', currentUser.id).single();
+  if (data) {
+    currentWins = data.wins || 0;
+  } else {
+    await supabaseClient.from('profiles').insert([{ id: currentUser.id, email: currentUser.email, wins: 0, last_win_time: 'Nunca' }]);
+    currentWins = 0;
+  }
   userWinsCount.textContent = currentWins;
+  await fetchGlobalScoreboard();
+}
+
+async function fetchGlobalScoreboard() {
+  const { data } = await supabaseClient.from('profiles').select('email, wins, last_win_time').order('wins', { ascending: false }).limit(5);
+  if (data && data.length > 0) {
+    scoreboardBody.innerHTML = '';
+    data.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>🏴‍☠️ ${row.email.split('@')[0]}</td><td>${row.last_win_time || 'Sin registro'}</td><td>🏆 <strong>${row.wins}</strong></td>`;
+      scoreboardBody.appendChild(tr);
+    });
+  } else {
+    scoreboardBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Aún no hay victorias registradas.</td></tr>`;
+  }
+}
+
+async function saveWin() {
+  currentWins += 1;
+  userWinsCount.textContent = currentWins;
+  const now = new Date().toLocaleString();
+  await supabaseClient.from('profiles').update({ wins: currentWins, last_win_time: now }).eq('id', currentUser.id);
+  await fetchGlobalScoreboard();
 }
 
 document.getElementById('joinRoomBtn').addEventListener('click', () => {
-  const code = document.getElementById('roomCodeInput').value.trim().toUpperCase() || 'ISLA1';
-  currentRoomCode.textContent = code;
+  roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase() || 'ISLA1';
+  playerName = document.getElementById('playerNameInput').value.trim() || currentUser.email.split('@')[0];
+  currentRoomCode.textContent = roomCode;
   roomLobby.hidden = false;
+  connectRealtimeRoom();
 });
 
-readyBtn.addEventListener('click', () => {
-  isReady = !isReady;
-  p1Status.textContent = isReady ? "¡LISTO! 🟢" : "No listo 🔴";
-  readyBtn.textContent = isReady ? "Cancelar Listo" : "¡Estoy Listo!";
+function connectRealtimeRoom() {
+  if (roomChannel) supabaseClient.removeChannel(roomChannel);
 
-  if (isReady) {
-    triggerCountdown();
+  roomChannel = supabaseClient.channel(`room_${roomCode}`, {
+    config: { presence: { key: currentUser.id } }
+  });
+
+  roomChannel
+    .on('presence', { event: 'sync' }, () => {
+      const state = roomChannel.presenceState();
+      const keys = Object.keys(state);
+      const myIndex = keys.indexOf(currentUser.id);
+      myRole = (myIndex === 0) ? 'p1' : 'p2';
+
+      p1Info.textContent = keys[0] ? "Conectado 🟢" : "Esperando...";
+      p2Info.textContent = keys[1] ? "Conectado 🟢" : "Esperando...";
+    })
+    .on('broadcast', { event: 'player_move' }, payload => {
+      if (payload.payload.role === 'p1') {
+        posX1 = payload.payload.x;
+        posY1 = payload.payload.y;
+        pirate1.style.left = posX1 + 'px';
+        pirate1.style.bottom = (55 + posY1) + 'px';
+      } else {
+        posX2 = payload.payload.x;
+        posY2 = payload.payload.y;
+        pirate2.style.left = posX2 + 'px';
+        pirate2.style.bottom = (55 + posY2) + 'px';
+      }
+    })
+    .on('broadcast', { event: 'chest_taken' }, payload => {
+      collectedChests.add(payload.payload.chestId);
+      const chestEl = document.getElementById(`chest-${payload.payload.chestId}`);
+      if (chestEl) chestEl.classList.add('collected');
+    })
+    .on('broadcast', { event: 'start_countdown' }, () => {
+      triggerCountdown();
+    })
+    .on('broadcast', { event: 'game_over' }, payload => {
+      endGameRemote(payload.payload.winnerRole);
+    })
+    .subscribe(async status => {
+      if (status === 'SUBSCRIBED') {
+        await roomChannel.track({ name: playerName, onlineAt: new Date().toISOString() });
+      }
+    });
+}
+
+readyBtn.addEventListener('click', async () => {
+  isReady = !isReady;
+  readyBtn.textContent = isReady ? "Cancelar Listo" : "¡Estoy Listo!";
+  readyBtn.style.background = isReady ? "#529e72" : "#e5b653";
+
+  if (isReady && myRole === 'p1') {
+    roomChannel.send({ type: 'broadcast', event: 'start_countdown', payload: {} });
   }
 });
 
@@ -77,12 +181,12 @@ function triggerCountdown() {
   let count = 5;
   countdownDisplay.textContent = count;
 
-  const timer = setInterval(() => {
+  const t = setInterval(() => {
     count--;
     if (count > 0) {
       countdownDisplay.textContent = count;
     } else {
-      clearInterval(timer);
+      clearInterval(t);
       countdownDisplay.hidden = true;
       startMatch();
     }
@@ -103,27 +207,12 @@ function startMatch() {
     updateTimerUI();
     if (timeLeft <= 0) {
       clearInterval(timerInterval);
-      clearInterval(botInterval);
       if (gameState === 'playing') {
         gameState = 'ended';
         timeOutOverlay.hidden = false;
       }
     }
   }, 1000);
-
-  botInterval = setInterval(() => {
-    if (gameState === 'playing') {
-      posX2 = Math.min(4050, posX2 + Math.floor(Math.random() * 12) + 6);
-      pirate2.style.left = posX2 + 'px';
-
-      if (posX2 >= 4050 && gameState === 'playing') {
-        gameState = 'ended';
-        clearInterval(timerInterval);
-        clearInterval(botInterval);
-        loseOverlay.hidden = false;
-      }
-    }
-  }, 180);
 }
 
 function updateTimerUI() {
@@ -139,11 +228,11 @@ function renderMap() {
   chestLayer.innerHTML = '';
 
   obstacles.forEach(x => {
-    const rock = document.createElement('div');
-    rock.className = 'obstacle-rock';
-    rock.style.left = x + 'px';
-    rock.textContent = '🪨';
-    obsLayer.appendChild(rock);
+    const bush = document.createElement('div');
+    bush.className = 'obstacle-bush';
+    bush.style.left = x + 'px';
+    bush.textContent = '🌿';
+    obsLayer.appendChild(bush);
   });
 
   chests.forEach((x, idx) => {
@@ -156,44 +245,100 @@ function renderMap() {
   });
 }
 
+// CONTROL POR TECLADO Y BOTONES TÁCTILES
 window.addEventListener('keydown', e => {
   if (gameState !== 'playing') return;
+  if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') movePlayer('right');
+  if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') movePlayer('left');
+  if (e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') movePlayer('jump');
+});
 
-  if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
-    posX1 = Math.min(4050, posX1 + 14);
-  }
-  if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
-    posX1 = Math.max(40, posX1 - 14);
-  }
-  if ((e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') && !isJumping1) {
-    isJumping1 = true;
-    posY1 = 90;
-    setTimeout(() => { posY1 = 0; isJumping1 = false; }, 400);
-  }
+document.getElementById('leftBtn').addEventListener('click', () => movePlayer('left'));
+document.getElementById('rightBtn').addEventListener('click', () => movePlayer('right'));
+document.getElementById('jumpBtn').addEventListener('click', () => movePlayer('jump'));
 
-  pirate1.style.left = posX1 + 'px';
-  pirate1.style.bottom = (55 + posY1) + 'px';
+function movePlayer(action) {
+  if (gameState !== 'playing') return;
+  let moved = false;
 
-  const camX = Math.max(0, posX1 - 220);
+  if (myRole === 'p1') {
+    if (action === 'right') { posX1 = Math.min(4050, posX1 + 14); moved = true; }
+    if (action === 'left') { posX1 = Math.max(40, posX1 - 14); moved = true; }
+    if (action === 'jump' && !isJumping1) {
+      isJumping1 = true; posY1 = 95; moved = true;
+      setTimeout(() => { posY1 = 0; isJumping1 = false; broadcastMove(); }, 350);
+    }
+    if (moved) {
+      pirate1.style.left = posX1 + 'px';
+      pirate1.style.bottom = (55 + posY1) + 'px';
+      broadcastMove();
+      checkCollisions(posX1, 'p1');
+    }
+  } else if (myRole === 'p2') {
+    if (action === 'right') { posX2 = Math.min(4050, posX2 + 14); moved = true; }
+    if (action === 'left') { posX2 = Math.max(40, posX2 - 14); moved = true; }
+    if (action === 'jump' && !isJumping2) {
+      isJumping2 = true; posY2 = 95; moved = true;
+      setTimeout(() => { posY2 = 0; isJumping2 = false; broadcastMove(); }, 350);
+    }
+    if (moved) {
+      pirate2.style.left = posX2 + 'px';
+      pirate2.style.bottom = (55 + posY2) + 'px';
+      broadcastMove();
+      checkCollisions(posX2, 'p2');
+    }
+  }
+}
+
+function broadcastMove() {
+  if (!roomChannel) return;
+  const x = myRole === 'p1' ? posX1 : posX2;
+  const y = myRole === 'p1' ? posY1 : posY2;
+
+  const camX = Math.max(0, x - 220);
   worldTrack.style.transform = `translateX(-${camX}px)`;
 
+  roomChannel.send({
+    type: 'broadcast',
+    event: 'player_move',
+    payload: { role: myRole, x, y }
+  });
+}
+
+function checkCollisions(xPos, role) {
   chests.forEach((cx, idx) => {
-    if (!collectedChests.has(idx) && Math.abs(posX1 - cx) < 25) {
+    if (!collectedChests.has(idx) && Math.abs(xPos - cx) < 25) {
       collectedChests.add(idx);
       const chestEl = document.getElementById(`chest-${idx}`);
       if (chestEl) chestEl.classList.add('collected');
+
+      roomChannel.send({
+        type: 'broadcast',
+        event: 'chest_taken',
+        payload: { chestId: idx }
+      });
     }
   });
 
-  if (posX1 >= 4050 && gameState === 'playing') {
+  if (xPos >= 4050 && gameState === 'playing') {
     gameState = 'ended';
-    clearInterval(timerInterval);
-    clearInterval(botInterval);
-    winOverlay.hidden = false;
-    currentWins += 1;
-    userWinsCount.textContent = currentWins;
-    if (currentUserEmail) {
-      localStorage.setItem('wins_' + currentUserEmail, currentWins);
-    }
+    roomChannel.send({
+      type: 'broadcast',
+      event: 'game_over',
+      payload: { winnerRole: role }
+    });
+    endGameRemote(role);
   }
-});
+}
+
+async function endGameRemote(winnerRole) {
+  gameState = 'ended';
+  clearInterval(timerInterval);
+
+  if (winnerRole === myRole) {
+    winOverlay.hidden = false;
+    await saveWin();
+  } else {
+    loseOverlay.hidden = false;
+  }
+}
