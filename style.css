@@ -5,220 +5,293 @@
 
 body {
   margin: 0;
-  padding: 0;
   font-family: Arial, sans-serif;
-  background: #102b3f;
-  color: white;
+  background: #102f2b;
+  color: #fff8e8;
 }
 
-button,
+header {
+  padding: 28px 6%;
+  background: linear-gradient(120deg,#164e43,#26745d);
+  border-bottom: 4px solid #d5a84d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+h1 { margin: 5px 0; font-size: clamp(25px,5vw,42px); }
+header p { color: #d8e9d9; }
+.eyebrow { color: #f4ca70; letter-spacing: 3px; font-weight: bold; }
+
+#connectionStatus {
+  background: #102f2b;
+  padding: 12px 18px;
+  border-radius: 30px;
+  color: #f4ca70;
+}
+
+main {
+  width: min(1000px,94%);
+  margin: 25px auto;
+}
+
+.panel {
+  background: #1b4039;
+  border: 1px solid #37665a;
+  border-radius: 16px;
+  padding: 22px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 20px #0003;
+}
+
+h2 { color: #f4ca70; margin-top: 0; }
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 input {
-  font: inherit;
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #729b81;
+  border-radius: 9px;
+  background: #102f2b;
+  color: white;
+  font-size: 15px;
 }
 
 button {
+  border: 0;
+  border-radius: 9px;
+  padding: 12px 17px;
+  font-weight: bold;
   cursor: pointer;
+  background: #dce9ce;
+  color: #214434;
 }
 
-/* CONTENEDOR PRINCIPAL */
+button:hover { filter: brightness(1.1); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.gold { background: #e5b653; color: #30230d; }
 
-#game,
-#gameContainer {
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 15px;
+#authStatus,
+#playerInfo,
+#readyMessage {
+  color: #c8d9c9;
+  line-height: 1.5;
 }
 
-/* ISLA Y MUNDO */
+#loggedInArea { margin-top: 12px; }
 
-#island {
-  position: relative;
-  width: 100%;
-  height: 300px;
-  overflow: hidden;
-  background: linear-gradient(
-    to bottom,
-    #78d5f5 0%,
-    #b7edff 65%,
-    #e6f7ff 100%
-  );
-  border: 4px solid #704523;
+.ready-grid,
+.score-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 15px 0;
+}
+
+.ready-grid > div,
+.score-grid > div {
+  padding: 17px;
   border-radius: 12px;
 }
 
-#world {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 4200px;
-  height: 300px;
+.red { background: #673b3b; }
+.blue { background: #294d70; }
+.score-grid p { font-size: 28px; font-weight: bold; }
+#readyButton { min-width: 190px; }
+
+.countdown {
+  font-size: 55px;
+  color: #f4ca70;
+  font-weight: bold;
+  margin: 15px;
 }
 
-/* DECORACIÓN DEL PAISAJE */
+.game-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
 
+.game-heading p { color: #c8d9c9; }
+#timerDisplay { font-size: 27px; color: #f4ca70; }
+
+/* ISLA */
+#island {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  border: 5px solid #b88b4c;
+  border-radius: 14px;
+  background: linear-gradient(
+    to bottom,
+    #71c8e7 0%,
+    #a4dfce 55%,
+    #78bd65 56%,
+    #78bd65 100%
+  );
+}
+
+/* MUNDO QUE SE DESPLAZA */
+#world {
+  position: absolute;
+  width: 4200px;
+  height: 100%;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+/* DECORACIÓN DEL FONDO */
 .scenery {
   position: absolute;
-  top: 55px;
   z-index: 1;
+  top: 35px;
+  left: 30px;
+  width: 4000px;
+  font-size: 42px;
+  white-space: nowrap;
   pointer-events: none;
 }
 
 /* SUELO */
-
 .ground {
   position: absolute;
+  z-index: 2;
   left: 0;
   bottom: 0;
-  width: 4200px;
+  width: 100%;
   height: 55px;
   background: linear-gradient(
     to bottom,
-    #8b5a2b 0%,
-    #68401f 100%
+    #86c45b 0 12px,
+    #9b713e 13px,
+    #77502e 100%
   );
-  border-top: 4px solid #4d9b32;
-  z-index: 2;
+  border-top: 4px solid #b2d76b;
 }
 
-/* OBSTÁCULOS Y COFRES */
-
-.obstacle,
-.chest {
+/*
+  OBSTÁCULOS:
+  bottom: 38px hace que se introduzcan un poco
+  en el suelo y no parezcan flotantes.
+*/
+.obstacle {
   position: absolute;
+  z-index: 4;
+  bottom: 38px;
+  width: 52px;
+  height: 58px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   line-height: 1;
+  font-size: 48px;
+  padding: 0;
+  margin: 0;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 
-.obstacle {
-  bottom: 38px;
-  z-index: 5;
-  font-size: 42px;
-}
-
+/* COFRES */
 .chest {
-  bottom: 38px;
-  z-index: 5;
-  font-size: 30px;
-}
-
-/* JUGADORES */
-
-.pirate {
   position: absolute;
-  bottom: 55px;
-  z-index: 6;
-  font-size: 42px;
+  z-index: 4;
+  bottom: 38px;
+  width: 46px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  font-size: 38px;
   line-height: 1;
-  transition: left 0.08s linear;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 
-/* META */
+.chest.collected {
+  display: none;
+}
 
+/* LÍNEA DE META */
 #finishLine {
   position: absolute;
-  right: 100px;
-  bottom: 55px;
-  height: 100px;
-  width: 8px;
-  background: repeating-linear-gradient(
-    to bottom,
-    white 0,
-    white 10px,
-    black 10px,
-    black 20px
-  );
   z-index: 4;
+  left: 4050px;
+  bottom: 55px;
+  background: #fff4cf;
+  color: #30230d;
+  border: 3px dashed #d5a84d;
+  padding: 10px;
+  font-weight: bold;
 }
 
-/* CÁMARA / DESPLAZAMIENTO */
-
-#world {
-  will-change: transform;
+/* PIRATAS */
+.pirate {
+  position: absolute;
+  z-index: 6;
+  width: 48px;
+  height: 48px;
+  bottom: 55px;
+  display: grid;
+  place-items: center;
+  border: 3px solid white;
+  border-radius: 50%;
+  font-size: 30px;
+  transform: translateX(-50%);
+  transition: left .12s,bottom .12s;
 }
 
-/* INFORMACIÓN DEL JUEGO */
+.pirate.red { background: #d84b42; }
+.pirate.blue { background: #347ed0; }
 
-#gameInfo,
-#raceInfo,
-#playersInfo {
+.controls,
+.actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-around;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0;
-  padding: 12px;
-  background: #173e55;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.controls button { min-width: 75px; }
+
+.message,
+.result {
+  background: #102f2b;
+  color: #f4ca70;
+  padding: 14px;
   border-radius: 10px;
+  margin-top: 15px;
 }
 
-/* MENSAJES DE RESULTADO */
-
-#result,
-#resultMessage,
-#gameMessage {
-  display: none;
+.result {
   text-align: center;
-  font-size: 30px;
-  font-weight: bold;
-  padding: 20px;
-  margin: 15px auto;
-  border-radius: 12px;
-  background: #173e55;
-  color: white;
+  border: 2px solid #d5a84d;
+  font-size: 20px;
 }
 
-/* BOTONES */
+li { margin: 8px 0; color: #d8e9d9; }
 
-button {
-  border: none;
-  border-radius: 8px;
-  padding: 10px 18px;
-  background: #f0b429;
-  color: #222;
-  font-weight: bold;
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #a8c4b1;
 }
 
-button:hover {
-  filter: brightness(1.08);
-}
+[hidden] { display: none !important; }
 
-/* CAMPOS */
-
-input {
-  padding: 10px;
-  border: 2px solid #aaa;
-  border-radius: 8px;
-  max-width: 100%;
-}
-
-/* PANTALLAS PEQUEÑAS */
-
-@media (max-width: 600px) {
-  #island {
-    height: 260px;
-  }
-
-  .pirate {
-    font-size: 36px;
-  }
-
-  .obstacle {
-    font-size: 36px;
-  }
-
-  .chest {
-    font-size: 26px;
-  }
-
-  #result,
-  #resultMessage,
-  #gameMessage {
-    font-size: 23px;
-  }
+@media(max-width:600px) {
+  header { padding: 22px 5%; }
+  .panel { padding: 16px; }
+  .ready-grid,
+  .score-grid { grid-template-columns: 1fr; }
+  .game-heading { align-items: flex-start; }
 }
