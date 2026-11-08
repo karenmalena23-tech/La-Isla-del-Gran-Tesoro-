@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -28,12 +27,20 @@
       <p>Crea tu cuenta o inicia sesión para guardar tus victorias.</p>
 
       <label for="emailInput">Correo electrónico</label>
-      <input id="emailInput" type="email"
-             autocomplete="email" placeholder="jugador@ejemplo.com">
+      <input
+        id="emailInput"
+        type="email"
+        autocomplete="email"
+        placeholder="jugador@ejemplo.com"
+      >
 
       <label for="passwordInput">Contraseña</label>
-      <input id="passwordInput" type="password"
-             autocomplete="current-password" placeholder="Mínimo 6 caracteres">
+      <input
+        id="passwordInput"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Mínimo 6 caracteres"
+      >
 
       <div class="auth-buttons">
         <button id="signUpButton" class="primary-button" type="button">
@@ -58,10 +65,18 @@
       <h2>⚓ Tu expedición</h2>
 
       <label for="playerName">Nombre del pirata</label>
-      <input id="playerName" maxlength="20" placeholder="Ej. Capitán Ana">
+      <input
+        id="playerName"
+        maxlength="20"
+        placeholder="Ej. Capitán Ana"
+      >
 
       <label for="roomCode">Código de la isla</label>
-      <input id="roomCode" maxlength="30" value="isla-principal">
+      <input
+        id="roomCode"
+        maxlength="30"
+        value="isla-principal"
+      >
 
       <button id="joinButton" class="primary-button" type="button">
         Entrar a la isla
@@ -81,6 +96,7 @@
           <span>🏴‍☠️ Capitán Rojo</span>
           <strong id="readyA">Esperando...</strong>
         </div>
+
         <div class="ready-card blue-card">
           <span>🏴‍☠️ Capitán Azul</span>
           <strong id="readyB">Esperando...</strong>
@@ -91,7 +107,10 @@
         ¡Estoy listo!
       </button>
 
-      <p id="readyMessage" class="helper">Entra a la isla para prepararte.</p>
+      <p id="readyMessage" class="helper">
+        Entra a la isla para prepararte.
+      </p>
+
       <div id="countdownDisplay" class="countdown" hidden>5</div>
     </section>
 
@@ -109,6 +128,7 @@
         <div id="island" class="island" aria-label="Aventura de la isla">
           <div id="world" class="game-world">
             <div class="world-background"></div>
+
             <div class="world-decoration decoration-one">🌴</div>
             <div class="world-decoration decoration-two">🌴</div>
             <div class="world-decoration decoration-three">🌳</div>
@@ -117,6 +137,7 @@
             <div class="world-decoration decoration-six">🦜</div>
 
             <div class="ground"></div>
+
             <div class="platform platform-one"></div>
             <div class="platform platform-two"></div>
             <div class="platform platform-three"></div>
@@ -125,10 +146,17 @@
             <div id="treasureArea"></div>
             <div id="finishLine" class="finish-line">🏁 META</div>
 
-            <div id="pirateA" class="pirate pirate-red"
-                 title="Capitán rojo">🏴‍☠️</div>
-            <div id="pirateB" class="pirate pirate-blue"
-                 title="Capitán azul">🏴‍☠️</div>
+            <div
+              id="pirateA"
+              class="pirate pirate-red"
+              title="Capitán rojo"
+            >🏴‍☠️</div>
+
+            <div
+              id="pirateB"
+              class="pirate pirate-blue"
+              title="Capitán azul"
+            >🏴‍☠️</div>
           </div>
         </div>
 
@@ -147,8 +175,12 @@
 
         <div class="game-options">
           <h3>⏱️ Tiempo restante: <span id="timerDisplay">05:00</span></h3>
-          <button id="restartButton" type="button">🔄 Reiniciar partida</button>
-          <button id="leaveButton" type="button">🚪 Abandonar partida</button>
+          <button id="restartButton" type="button">
+            🔄 Reiniciar partida
+          </button>
+          <button id="leaveButton" type="button">
+            🚪 Abandonar partida
+          </button>
         </div>
 
         <p id="gameMessage" class="message" role="status">
@@ -199,10 +231,23 @@
     </section>
 
     <section class="panel">
+      <h2>🏆 Tabla de marcadores compartida</h2>
+      <p>
+        Aquí se cuentan las carreras ganadas por los jugadores.
+        Ambos participantes pueden consultar los mismos resultados.
+      </p>
+      <ol id="leaderboardList">
+        <li>El marcador aparecerá cuando termine una carrera.</li>
+      </ol>
+    </section>
+
+    <section class="panel">
       <h2>📚 Historial compartido de carreras</h2>
-      <p>Los dos jugadores pueden consultar el resultado de las carreras que compartieron.</p>
+      <p>
+        Los dos jugadores pueden consultar el resultado de las carreras que compartieron.
+      </p>
       <ul id="matchHistoryList">
-        <li>Entra a una isla para consultar las carreras.</li>
+        <li>Inicia sesión para consultar las carreras.</li>
       </ul>
     </section>
 
@@ -210,24 +255,14 @@
       <h2>📖 Cómo jugar</h2>
       <ol>
         <li>Crea una cuenta o inicia sesión.</li>
-        <li>Escribe tu nombre y entra a la isla.</li>
-        <li>Comparte el código de la isla con el otro jugador.</li>
-        <li>Los dos capitanes deben marcar que están listos.</li>
+        <li>Escribe tu nombre y el código de la isla.</li>
+        <li>Comparte el código con el otro jugador.</li>
+        <li>Los dos capitanes deben marcar «¡Estoy listo!».</li>
         <li>Cuando termine la cuenta regresiva, comienza la carrera.</li>
         <li>Usa las flechas o WASD para moverte y saltar.</li>
-        <li>Gana quien llegue primero a la meta.</li>
+        <li>Gana quien llegue primero a la meta antes de cinco minutos.</li>
+        <li>Si se acaba el tiempo, ambos pierden la carrera.</li>
       </ol>
-    </section>
-
-    <section class="panel">
-      <h2>📝 Qué te falta para Proyecto 2</h2>
-      <p>
-        Para Proyecto 2 me falta integrar el inicio de sesión con correo
-        electrónico y contraseña. Empezaré configurando Supabase Auth para
-        que cada jugador pueda crear su propia cuenta. Después vincularé
-        las partidas ganadas a cada usuario y mostraré un marcador compartido
-        para que los dos jugadores puedan consultar quién ganó cada carrera.
-      </p>
     </section>
 
   </main>
