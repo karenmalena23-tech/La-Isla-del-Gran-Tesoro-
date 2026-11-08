@@ -550,3 +550,17 @@ footer {
   .controls { justify-content: center; }
   .game-options button { flex: 1; }
 }
+.pirate-name {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: #ffffff;
+  color: #222222;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  z-index: 30;
+}
