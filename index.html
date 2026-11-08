@@ -3,114 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>La Isla del Tesoro - Carrera Multiplayer</title>
+  <title>La Isla del Tesoro - 2 Jugadores</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- Supabase JS CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
   <header>
     <div>
-      <span class="eyebrow">PROYECTO MULTIJUGADOR</span>
+      <span class="eyebrow">PROYECTO FINAL</span>
       <h1>🏝️ La Isla del Tesoro</h1>
-      <p>Carrera 2D en tiempo real</p>
+      <p>Carrera Local de 2 Jugadores</p>
     </div>
-    <div id="connectionStatus">● Conectado a la Isla</div>
+    <div id="connectionStatus">● Listo para Jugar</div>
   </header>
 
   <main>
-    <!-- SECCIÓN DE AUTENTICACIÓN -->
-    <section id="authSection" class="panel">
-      <h2>1. Registro e Inicio de Sesión</h2>
-      <div class="fields">
-        <input type="email" id="emailInput" placeholder="Correo electrónico" value="pirata@isla.com" />
-        <input type="password" id="passwordInput" placeholder="Contraseña" value="123456" />
-        <button id="loginBtn" class="gold">Iniciar Sesión</button>
-        <button id="signupBtn">Registrarse</button>
-      </div>
-      <p id="authStatus">Introduce tus datos para ingresar a la carrera.</p>
-    </section>
-
-    <!-- ÁREA DE JUEGO Y SALA DE ESPERA -->
+    <!-- SALA Y CONTROLES -->
     <section id="gameArea" class="panel">
-      <div id="playerInfo"></div>
-
-      <!-- SALA DE ESPERA -->
-      <div id="lobbySection">
-        <h2>2. Sala de Espera</h2>
-        <div class="ready-grid">
-          <div class="red">
-            <h3>🔴 Jugador 1 (Pirata Rojo)</h3>
-            <p id="playerAStatus">Esperando jugador...</p>
-          </div>
-          <div class="blue">
-            <h3>🔵 Jugador 2 (Pirata Azul / Rival)</h3>
-            <p id="playerBStatus">Esperando rival...</p>
-          </div>
-        </div>
-        <button id="readyButton" class="gold">¡Estoy Listo!</button>
-        <p id="readyMessage">Haz clic para indicar que estás listo para la carrera.</p>
+      <div class="game-heading">
+        <h2>🏴‍☠️ ¡Duelo en la Selva!</h2>
+        <div id="timerDisplay">⏱️ 05:00</div>
       </div>
+      <p><strong>Jugador 1 (🔴):</strong> A / D para mover, W / Espacio para saltar.<br><strong>Jugador 2 (🔵):</strong> Flechas ⬅️ ➡️ para mover, ⬆️ para saltar.</p>
 
-      <!-- PANTALLA DE CONTEO -->
-      <div id="countdownDisplay" class="countdown" hidden>3</div>
-
-      <!-- ESCENARIO DEL JUEGO -->
-      <div id="gameplaySection" hidden>
-        <div class="game-heading">
-          <h2>🏴‍☠️ ¡Carrera por el Tesoro!</h2>
-          <div id="timerDisplay">⏱️ 05:00</div>
-        </div>
-        <p>Usa las flechas ⬅️ ➡️ o las teclas A/D para avanzar, y ⬆️ / Espacio para saltar.</p>
-
-        <!-- CONTENEDOR DE LA ISLA -->
-        <div id="island">
-          <div id="world">
-            <div class="scenery">🌴    🌳     🌴    🏝️    🌳    🌴</div>
-            <div id="obstaclesContainer"></div>
-            <div id="chestsContainer"></div>
-            <div id="pirateA" class="pirate red">🏴‍☠️</div>
-            <div id="pirateB" class="pirate blue">🦜</div>
-            <div id="finishLine">🏁 META 🏆</div>
-            <div class="ground"></div>
-          </div>
-        </div>
-
-        <!-- CONTROLES TÁCTILES / PANTALLA -->
-        <div class="controls">
-          <button id="leftBtn">⬅️ Atras</button>
-          <button id="jumpBtn" class="gold">⬆️ Saltar</button>
-          <button id="rightBtn">➡️ Avanzar</button>
-        </div>
-
-        <div class="actions">
-          <button id="resetRaceBtn">Reiniciar Carrera</button>
+      <!-- CONTENEDOR DE LA ISLA -->
+      <div id="island">
+        <div id="world">
+          <div class="scenery">🌴    🌳     🌴    🏝️    🌳    🌴</div>
+          <div id="obstaclesContainer"></div>
+          <div id="chestsContainer"></div>
+          <div id="pirateA" class="pirate red">🏴‍☠️</div>
+          <div id="pirateB" class="pirate blue">🦜</div>
+          <div id="finishLine">🏁 META 🏆</div>
+          <div class="ground"></div>
         </div>
       </div>
 
-      <!-- OVERLAY DE RESULTADOS -->
-      <div id="resultOverlay" class="result" hidden>
-        <h2 id="resultTitle">🏆 ¡FIN DE LA CARRERA!</h2>
-        <p id="resultDetails"></p>
-        <button id="playAgainBtn" class="gold">Jugar otra vez</button>
+      <div class="actions" style="margin-top: 15px;">
+        <button id="startRaceBtn" class="gold">¡Iniciar Carrera!</button>
+        <button id="resetRaceBtn">Reiniciar</button>
       </div>
     </section>
 
-    <!-- HISTORIAL DE VICTORIAS -->
+    <!-- MARCADOR DE COFRES Y VICTORIAS -->
     <section class="panel">
-      <h2>🏆 Tabla de Victorias Guardadas</h2>
+      <h2>🏆 Marcador y Tesoros Recolectados</h2>
       <div class="score-grid">
         <div class="red">
-          <h4>Victorias Pirata Rojo</h4>
-          <p id="scoreA">0</p>
+          <h4>Pirata Rojo (J1)</h4>
+          <p>Cofres: <span id="chestsA">0</span></p>
         </div>
         <div class="blue">
-          <h4>Victorias Pirata Azul</h4>
-          <p id="scoreB">0</p>
+          <h4>Pirata Azul (J2)</h4>
+          <p>Cofres: <span id="chestsB">0</span></p>
         </div>
       </div>
     </section>
+
+    <!-- OVERLAY DE RESULTADOS -->
+    <div id="resultOverlay" class="result" hidden>
+      <h2 id="resultTitle">🏆 ¡FIN DE LA CARRERA!</h2>
+      <p id="resultDetails"></p>
+      <button id="playAgainBtn" class="gold">Jugar otra vez</button>
+    </div>
   </main>
 
   <footer>
