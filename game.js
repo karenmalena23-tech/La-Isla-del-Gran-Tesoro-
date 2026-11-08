@@ -1,180 +1,160 @@
 
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY =
-  "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
+const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY
-);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const WORLD_WIDTH = 4200;
-const PLAYER_START_X = 140;
-const PLAYER_START_Y = 296;
 const FINISH_X = 4050;
-const GROUND_TOP = 338;
-const PLAYER_SPEED = 5;
+const GROUND_TOP = 328;
+const PLAYER_HEIGHT = 46;
+const SPEED = 5;
 const GRAVITY = 0.65;
 const JUMP_FORCE = -13;
-const GAME_DURATION = 300;
-const SAVE_INTERVAL = 150;
+const GAME_SECONDS = 300;
 
 const PLATFORMS = [
-  { x: 430, top: 270, width: 190 },
-  { x: 850, top: 225, width: 180 },
-  { x: 1300, top: 265, width: 220 },
-  { x: 1750, top: 210, width: 190 },
-  { x: 2250, top: 255, width: 220 },
-  { x: 2750, top: 205, width: 200 },
-  { x: 3250, top: 255, width: 220 },
-  { x: 3700, top: 220, width: 190 }
+  { x: 430, top: 245, width: 180 },
+  { x: 1050, top: 200, width: 190 },
+  { x: 1720, top: 255, width: 220 },
+  { x: 2250, top: 225, width: 190 },
+  { x: 2750, top: 190, width: 200 },
+  { x: 3300, top: 245, width: 210 },
+  { x: 3750, top: 210, width: 190 }
 ];
 
 const OBSTACLES = [
-  { x: 580, y: 300, icon: "🪨" },
-  { x: 960, y: 300, icon: "🌳" },
-  { x: 1430, y: 300, icon: "🪵" },
-  { x: 1900, y: 300, icon: "🪨" },
-  { x: 2450, y: 300, icon: "🌳" },
-  { x: 2900, y: 300, icon: "🪵" },
-  { x: 3400, y: 300, icon: "🪨" },
-  { x: 3850, y: 300, icon: "🌳" }
+  { x: 700, y: 300, icon: "🪨" },
+  { x: 1350, y: 300, icon: "🪵" },
+  { x: 2050, y: 300, icon: "🌳" },
+  { x: 2600, y: 300, icon: "🪨" },
+  { x: 3150, y: 300, icon: "🪵" },
+  { x: 3650, y: 300, icon: "🌳" }
 ];
 
 const $ = (id) => document.getElementById(id);
 
 let currentUser = null;
 let currentPlayer = null;
-let roomPlayers = [];
-let roomData = null;
+let players = [];
+let room = null;
 let roomCode = "";
-let roomStatus = "waiting";
 let channel = null;
 
-let busy = false;
-let savingPosition = false;
-let finishing = false;
-let endingByTime = false;
-let savingMatch = false;
-
+let keys = new Set();
 let velocityY = 0;
 let grounded = false;
-let pressedKeys = new Set();
-
-let gameLoop = null;
-let timerInterval = null;
-let lastFrameTime = 0;
-let lastSaveTime = 0;
-let lastHistoryRaceKey = "";
-
-// --------------------------------------------------
-// MENSAJES Y UTILIDADES
-// --------------------------------------------------
-
-function setMessage(message) {
-  $("gameMessage").textContent = message;
-}
-
-function setStatus(message) {
-  $("connectionStatus").textContent = message;
-}
-
-function setAuthMessage(message) {
-  $("authStatus").textContent = message;
-}
-
-function storageKey(code) {
-  return `treasure_player_${code}`;
-}
-
-function formatDate(value) {
-  return new Date(value).toLocaleString();
-}
+let loopId = null;
+let timerId = null;
+let lastFrame = 0;
+let lastPositionSave = 0;
+let busy = false;
+let finishing = false;
+let savingResult = false;
+let lastSavedRace = "";
 
 // --------------------------------------------------
-// CUENTAS: REGISTRO, INICIO Y CIERRE DE SESIÓN
+// MENSAJES
 // --------------------------------------------------
 
-async function updateAuthUI() {
-  const loggedIn = Boolean(currentUser);
+function message(text) {
+  $("gameMessage").textContent = text;
+}
 
-  $("loggedInArea").hidden = !loggedIn;
-  $("emailInput").disabled = loggedIn;
-  $("passwordInput").disabled = loggedIn;
-  $("signUpButton").hidden = loggedIn;
-  $("loginButton").hidden = loggedIn;
+function playerMessage(text) {
+  $("playerInfo").textContent = text;
+}
+
+function status(text) {
+  $("connectionStatus").textContent = text;
+}
+
+function authMessage(text) {
+  $("authStatus").textContent = text;
+}
+
+function getRoleName(role) {
+  return role === "red" ? "Pirata Rojo 🔴" : "Pirata Azul 🔵";
+}
+
+function getStartPosition(role) {
+  return role === "red" ? 140 : 200;
+}
+
+// --------------------------------------------------
+// AUTENTICACIÓN
+// --------------------------------------------------
+
+async function refreshAuthUI() {
+  const logged = Boolean(currentUser);
+
+  $("loggedInArea").hidden = !logged;
+  $("emailInput").disabled = logged;
+  $("passwordInput").disabled = logged;
+  $("signUpButton").hidden = logged;
+  $("loginButton").hidden = logged;
 
   $("accountEmail").textContent = currentUser?.email || "";
 
-  if (loggedIn) {
-    setAuthMessage("Sesión iniciada. Ya puedes entrar a la isla.");
+  if (logged) {
+    authMessage("Sesión iniciada correctamente.");
     await loadWinHistory();
     await loadMatchHistory();
   } else {
-    setAuthMessage("Inicia sesión para entrar a la isla.");
+    authMessage("Inicia sesión para jugar.");
     $("totalWins").textContent = "0";
-    $("historyList").innerHTML =
-      "<li>Inicia sesión para consultar tu historial.</li>";
-    $("matchHistoryList").innerHTML =
-      "<li>Inicia sesión para consultar las carreras.</li>";
+    $("historyList").innerHTML = "<li>Inicia sesión para ver tus victorias.</li>";
+    $("matchHistoryList").innerHTML = "<li>Inicia sesión para ver las carreras.</li>";
   }
 }
 
-async function signUp() {
+async function register() {
   const email = $("emailInput").value.trim();
   const password = $("passwordInput").value;
 
   if (!email || !password) {
-    setAuthMessage("Escribe tu correo y una contraseña.");
+    authMessage("Escribe tu correo y contraseña.");
     return;
   }
 
   if (password.length < 6) {
-    setAuthMessage("La contraseña debe tener al menos 6 caracteres.");
+    authMessage("La contraseña debe tener al menos 6 caracteres.");
     return;
   }
 
   $("signUpButton").disabled = true;
-  setAuthMessage("Creando tu cuenta...");
 
   try {
-    const { data, error } = await supabaseClient.auth.signUp({
-      email,
-      password
-    });
-
+    const { data, error } = await db.auth.signUp({ email, password });
     if (error) throw error;
 
     if (data.session) {
       currentUser = data.user;
-      await updateAuthUI();
-      setAuthMessage("¡Cuenta creada! Ya puedes entrar a la isla.");
+      await refreshAuthUI();
+      authMessage("¡Cuenta creada correctamente!");
     } else {
-      setAuthMessage(
-        "Cuenta creada. Revisa tu correo, confirma la cuenta y luego inicia sesión."
-      );
+      authMessage("Cuenta creada. Revisa tu correo para confirmar el registro.");
     }
   } catch (error) {
-    setAuthMessage("No se pudo crear la cuenta: " + error.message);
+    authMessage("Error al crear la cuenta: " + error.message);
   } finally {
     $("signUpButton").disabled = false;
   }
 }
 
-async function signIn() {
+async function login() {
   const email = $("emailInput").value.trim();
   const password = $("passwordInput").value;
 
   if (!email || !password) {
-    setAuthMessage("Escribe tu correo y contraseña.");
+    authMessage("Escribe tu correo y contraseña.");
     return;
   }
 
   $("loginButton").disabled = true;
-  setAuthMessage("Iniciando sesión...");
 
   try {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
+    const { data, error } = await db.auth.signInWithPassword({
       email,
       password
     });
@@ -182,69 +162,63 @@ async function signIn() {
     if (error) throw error;
 
     currentUser = data.user;
-    await updateAuthUI();
-    setAuthMessage("¡Bienvenido de nuevo!");
+    await refreshAuthUI();
+    authMessage("¡Bienvenido!");
   } catch (error) {
-    setAuthMessage("No se pudo iniciar sesión: " + error.message);
+    authMessage("Error al iniciar sesión: " + error.message);
   } finally {
     $("loginButton").disabled = false;
   }
 }
 
-async function signOut() {
+async function logout() {
   try {
-    if (currentPlayer) {
-      await leaveGame(false);
-    }
+    if (currentPlayer) await leaveIsland(false);
 
-    const { error } = await supabaseClient.auth.signOut();
+    const { error } = await db.auth.signOut();
     if (error) throw error;
 
     currentUser = null;
     currentPlayer = null;
-
-    await updateAuthUI();
-    setMessage("Has cerrado sesión.");
-    setStatus("Sesión cerrada");
+    await refreshAuthUI();
+    status("Sesión cerrada");
   } catch (error) {
-    setAuthMessage("No se pudo cerrar sesión: " + error.message);
+    authMessage("No se pudo cerrar sesión: " + error.message);
   }
 }
 
-async function initializeAuth() {
-  const { data, error } = await supabaseClient.auth.getSession();
+async function initAuth() {
+  const { data, error } = await db.auth.getSession();
   if (error) throw error;
 
   currentUser = data.session?.user || null;
-  await updateAuthUI();
+  await refreshAuthUI();
 
-  // Evita ejecutar consultas dentro del callback de Auth.
-  supabaseClient.auth.onAuthStateChange((_event, session) => {
+  db.auth.onAuthStateChange((_event, session) => {
     setTimeout(async () => {
       currentUser = session?.user || null;
-      await updateAuthUI();
+      await refreshAuthUI();
     }, 0);
   });
 }
 
 // --------------------------------------------------
-// HISTORIAL PERSONAL DE VICTORIAS
+// HISTORIAL PERSONAL
 // --------------------------------------------------
 
 async function loadWinHistory() {
   if (!currentUser) return;
 
-  const { data, error } = await supabaseClient
+  const { data, error } = await db
     .from("treasure_wins")
     .select("id, room_code, player_name, won_at")
     .eq("user_id", currentUser.id)
     .order("won_at", { ascending: false })
-    .limit(50);
+    .limit(30);
 
   if (error) {
-    console.error("Error cargando victorias:", error);
-    $("historyList").innerHTML =
-      "<li>No se pudo cargar el historial personal.</li>";
+    console.error(error);
+    $("historyList").innerHTML = "<li>No se pudo cargar el historial.</li>";
     return;
   }
 
@@ -252,27 +226,27 @@ async function loadWinHistory() {
   $("historyList").innerHTML = "";
 
   if (!data.length) {
-    $("historyList").innerHTML =
-      "<li>Aún no tienes victorias guardadas.</li>";
+    $("historyList").innerHTML = "<li>Aún no tienes victorias.</li>";
     return;
   }
 
   data.forEach((win) => {
     const li = document.createElement("li");
     li.textContent =
-      `🏆 ${win.player_name} — Isla: ${win.room_code} — ${formatDate(win.won_at)}`;
+      `🏆 ${win.player_name} — Isla ${win.room_code} — ` +
+      new Date(win.won_at).toLocaleString();
     $("historyList").appendChild(li);
   });
 }
 
 // --------------------------------------------------
-// HISTORIAL COMPARTIDO DE CARRERAS
+// HISTORIAL COMPARTIDO
 // --------------------------------------------------
 
 async function loadMatchHistory() {
   if (!currentUser) return;
 
-  const { data, error } = await supabaseClient
+  const { data, error } = await db
     .from("treasure_match_history")
     .select(
       "room_code, red_player_name, blue_player_name, winner_name, winner_role, finished_at"
@@ -284,7 +258,7 @@ async function loadMatchHistory() {
     .limit(30);
 
   if (error) {
-    console.error("Error cargando carreras:", error);
+    console.error(error);
     $("matchHistoryList").innerHTML =
       "<li>No se pudo cargar el historial compartido.</li>";
     return;
@@ -294,65 +268,56 @@ async function loadMatchHistory() {
 
   if (!data.length) {
     $("matchHistoryList").innerHTML =
-      "<li>Todavía no hay carreras guardadas.</li>";
+      "<li>Aún no hay carreras registradas.</li>";
     return;
   }
 
   data.forEach((match) => {
     const li = document.createElement("li");
     li.textContent =
-      `🏆 Ganó ${match.winner_name} ` +
-      `(${match.winner_role === "red" ? "Rojo" : "Azul"}). ` +
-      `Participantes: ${match.red_player_name} y ${match.blue_player_name}. ` +
-      `Isla: ${match.room_code}. ${formatDate(match.finished_at)}`;
-
+      `🏆 Ganó ${match.winner_name} (${match.winner_role}). ` +
+      `Participaron ${match.red_player_name} y ${match.blue_player_name}. ` +
+      `Isla: ${match.room_code}.`;
     $("matchHistoryList").appendChild(li);
   });
 }
 
 async function saveMatchResult() {
-  if (!currentUser || !currentPlayer || !roomData || savingMatch) return;
+  if (!currentUser || !currentPlayer || !room || savingResult) return;
+  if (room.winner_player_id !== currentPlayer.id) return;
 
-  const winnerId = roomData.winner_player_id;
-  if (!winnerId || winnerId !== currentPlayer.id) return;
+  const red = players.find((p) => p.role === "red");
+  const blue = players.find((p) => p.role === "blue");
 
-  const red = roomPlayers.find((p) => p.role === "red");
-  const blue = roomPlayers.find((p) => p.role === "blue");
-
-  if (!red || !blue || !red.user_id || !blue.user_id) {
-    console.warn("No se pudo guardar: faltan datos de los dos jugadores.");
+  if (!red || !blue || !red.user_id || !blue.user_id || !room.started_at) {
+    console.error("Faltan datos de los dos jugadores para guardar la carrera.");
     return;
   }
 
-  const raceStart = roomData.started_at;
-  if (!raceStart) return;
+  const raceKey = `${roomCode}_${room.started_at}`;
+  if (lastSavedRace === raceKey) return;
 
-  const raceKey = `${roomCode}_${raceStart}`;
-  if (lastHistoryRaceKey === raceKey) return;
-
-  savingMatch = true;
+  savingResult = true;
 
   try {
-    const { error: matchError } = await supabaseClient
+    const { error } = await db
       .from("treasure_match_history")
       .insert({
         room_code: roomCode,
-        race_started_at: raceStart,
+        race_started_at: room.started_at,
         red_player_name: red.player_name,
         blue_player_name: blue.player_name,
         red_user_id: red.user_id,
         blue_user_id: blue.user_id,
-        winner_player_id: winnerId,
+        winner_player_id: currentPlayer.id,
         winner_user_id: currentUser.id,
-        winner_name: roomData.winner_name || currentPlayer.player_name,
+        winner_name: currentPlayer.player_name,
         winner_role: currentPlayer.role
       });
 
-    if (matchError && matchError.code !== "23505") {
-      throw matchError;
-    }
+    if (error && error.code !== "23505") throw error;
 
-    const { error: personalError } = await supabaseClient
+    const { error: winError } = await db
       .from("treasure_wins")
       .insert({
         user_id: currentUser.id,
@@ -360,27 +325,24 @@ async function saveMatchResult() {
         player_name: currentPlayer.player_name
       });
 
-    if (personalError) {
-      console.error("Error guardando victoria personal:", personalError);
-    }
+    if (winError) console.error("Error guardando victoria personal:", winError);
 
-    lastHistoryRaceKey = raceKey;
-
+    lastSavedRace = raceKey;
     await loadWinHistory();
     await loadMatchHistory();
   } catch (error) {
-    console.error("Error guardando el resultado:", error);
+    console.error("Error guardando resultado:", error);
   } finally {
-    savingMatch = false;
+    savingResult = false;
   }
 }
 
 // --------------------------------------------------
-// SALAS Y JUGADORES
+// SALA
 // --------------------------------------------------
 
 async function ensureRoom(code) {
-  const { data, error } = await supabaseClient
+  const { data, error } = await db
     .from("treasure_rooms")
     .select("*")
     .eq("room_code", code)
@@ -389,7 +351,7 @@ async function ensureRoom(code) {
   if (error) throw error;
   if (data) return data;
 
-  const { data: created, error: insertError } = await supabaseClient
+  const { data: created, error: insertError } = await db
     .from("treasure_rooms")
     .insert({
       room_code: code,
@@ -404,7 +366,7 @@ async function ensureRoom(code) {
 
   if (insertError) {
     if (insertError.code === "23505") {
-      const retry = await supabaseClient
+      const retry = await db
         .from("treasure_rooms")
         .select("*")
         .eq("room_code", code)
@@ -424,14 +386,12 @@ async function loadRoom() {
   if (!roomCode) return;
 
   const [playersResult, roomResult] = await Promise.all([
-    supabaseClient
-      .from("treasure_players")
+    db.from("treasure_players")
       .select("*")
       .eq("room_code", roomCode)
-      .order("role", { ascending: true }),
+      .order("role"),
 
-    supabaseClient
-      .from("treasure_rooms")
+    db.from("treasure_rooms")
       .select("*")
       .eq("room_code", roomCode)
       .maybeSingle()
@@ -440,61 +400,25 @@ async function loadRoom() {
   if (playersResult.error) throw playersResult.error;
   if (roomResult.error) throw roomResult.error;
 
-  roomPlayers = playersResult.data || [];
-  roomData = roomResult.data;
-  roomStatus = roomData?.status || "waiting";
+  players = playersResult.data || [];
+  room = roomResult.data;
 
   if (currentPlayer) {
-    const updated = roomPlayers.find((p) => p.id === currentPlayer.id);
-    if (updated) currentPlayer = updated;
+    currentPlayer = players.find((p) => p.id === currentPlayer.id) || currentPlayer;
   }
 
-  renderWaitingRoom();
-  renderPlayers();
-  renderFinalResult();
-  updateTimerDisplay();
+  drawPlayers();
+  drawWaitingRoom();
+  drawResult();
+  updateTimer();
 }
 
-function renderWaitingRoom() {
-  const red = roomPlayers.find((p) => p.role === "red");
-  const blue = roomPlayers.find((p) => p.role === "blue");
-
-  $("readyA").textContent = red
-    ? `${red.player_name} ${red.is_ready ? "✓ Listo" : "— Esperando"}`
-    : "Esperando...";
-
-  $("readyB").textContent = blue
-    ? `${blue.player_name} ${blue.is_ready ? "✓ Listo" : "— Esperando"}`
-    : "Esperando...";
-
-  $("readyButton").disabled =
-    !currentPlayer ||
-    roomStatus !== "waiting" ||
-    Boolean(currentPlayer.is_ready);
-
-  if (roomStatus === "waiting") {
-    $("readyMessage").textContent =
-      roomPlayers.length < 2
-        ? "Esperando al segundo capitán."
-        : "Los dos jugadores deben marcar que están listos.";
-  } else if (roomStatus === "countdown") {
-    $("readyMessage").textContent = "¡Prepárense! La carrera está por comenzar.";
-  } else if (roomStatus === "racing") {
-    $("readyMessage").textContent = "¡La carrera está en marcha!";
-  } else if (roomStatus === "finished") {
-    $("readyMessage").textContent = "La partida ha terminado.";
-  }
-
-  $("waitingRoom").hidden = !currentPlayer;
-}
-
-function renderPlayers() {
-  const red = roomPlayers.find((p) => p.role === "red");
-  const blue = roomPlayers.find((p) => p.role === "blue");
+function drawPlayers() {
+  const red = players.find((p) => p.role === "red");
+  const blue = players.find((p) => p.role === "blue");
 
   $("nameA").textContent = red?.player_name || "Pirata Rojo";
   $("nameB").textContent = blue?.player_name || "Pirata Azul";
-
   $("scoreA").textContent = red?.score ?? 0;
   $("scoreB").textContent = blue?.score ?? 0;
 
@@ -504,29 +428,126 @@ function renderPlayers() {
   const list = $("activityList");
   list.innerHTML = "";
 
-  if (!roomPlayers.length) {
-    list.innerHTML = "<li>Esperando a los capitanes...</li>";
+  if (!players.length) {
+    list.innerHTML = "<li>Esperando a los jugadores...</li>";
     return;
   }
 
-  roomPlayers.forEach((player) => {
+  players.forEach((p) => {
     const li = document.createElement("li");
     li.textContent =
-      `${player.role === "red" ? "🔴" : "🔵"} ${player.player_name}: ` +
-      (player.finished_at ? "Llegó a la meta" :
-        player.is_ready ? "Listo" : "Esperando");
+      `${p.role === "red" ? "🔴" : "🔵"} ${p.player_name}: ` +
+      (p.finished_at ? "Llegó a la meta" :
+        p.is_ready ? "Está listo" : "Esperando");
     list.appendChild(li);
   });
 }
 
+function drawWaitingRoom() {
+  const red = players.find((p) => p.role === "red");
+  const blue = players.find((p) => p.role === "blue");
+
+  $("readyA").textContent = red
+    ? `${red.player_name} — ${red.is_ready ? "✓ Listo" : "Esperando"}`
+    : "Esperando jugador rojo...";
+
+  $("readyB").textContent = blue
+    ? `${blue.player_name} — ${blue.is_ready ? "✓ Listo" : "Esperando"}`
+    : "Esperando jugador azul...";
+
+  $("readyA").className = red?.is_ready ? "ready" : "waiting";
+  $("readyB").className = blue?.is_ready ? "ready" : "waiting";
+
+  $("waitingRoom").hidden = !currentPlayer;
+
+  $("readyButton").disabled =
+    !currentPlayer ||
+    room?.status !== "waiting" ||
+    Boolean(currentPlayer.is_ready);
+
+  if (!room) return;
+
+  if (room.status === "waiting") {
+    $("readyMessage").textContent = players.length < 2
+      ? "Esperando al segundo jugador..."
+      : "Los dos jugadores deben pulsar ¡Estoy listo!";
+  } else if (room.status === "countdown") {
+    $("readyMessage").textContent = "¡Prepárense! La carrera va a comenzar.";
+  } else if (room.status === "racing") {
+    $("readyMessage").textContent = "¡La carrera está en marcha!";
+  } else if (room.status === "finished") {
+    $("readyMessage").textContent = "La carrera terminó.";
+  }
+}
+
 // --------------------------------------------------
-// ENTRAR A LA ISLA
+// PIRATAS Y ESCENARIO
+// --------------------------------------------------
+
+function drawPirate(element, player) {
+  if (!player) {
+    element.style.display = "none";
+    return;
+  }
+
+  element.style.display = "grid";
+  element.style.left = `${Number(player.x)}px`;
+  element.style.top = `${Number(player.y)}px`;
+}
+
+function buildWorld() {
+  $("world").style.width = WORLD_WIDTH + "px";
+
+  const finish = $("finishLine");
+  finish.style.left = FINISH_X + "px";
+
+  const obstacleArea = $("obstacleArea");
+  obstacleArea.innerHTML = "";
+
+  OBSTACLES.forEach((item) => {
+    const obstacle = document.createElement("div");
+    obstacle.className = "obstacle";
+    obstacle.textContent = item.icon;
+    obstacle.style.left = `${item.x}px`;
+    obstacle.style.top = `${item.y}px`;
+    obstacleArea.appendChild(obstacle);
+  });
+
+  const treasureArea = $("treasureArea");
+  treasureArea.innerHTML = "";
+
+  PLATFORMS.forEach((item) => {
+    const platform = document.createElement("div");
+    platform.className = "platform";
+    platform.style.left = `${item.x}px`;
+    platform.style.top = `${item.top}px`;
+    platform.style.width = `${item.width}px`;
+    treasureArea.appendChild(platform);
+  });
+}
+
+function updateCamera() {
+  if (!currentPlayer) return;
+
+  const viewportWidth = $("island").clientWidth;
+  const camera = Math.max(
+    0,
+    Math.min(
+      WORLD_WIDTH - viewportWidth,
+      Number(currentPlayer.x) - viewportWidth / 2
+    )
+  );
+
+  $("world").style.transform = `translateX(${-camera}px)`;
+}
+
+// --------------------------------------------------
+// ENTRAR A LA ISLA Y ASIGNAR COLOR
 // --------------------------------------------------
 
 async function joinIsland() {
   if (!currentUser) {
-    $("playerInfo").textContent =
-      "Primero crea una cuenta o inicia sesión.";
+    playerMessage("Primero inicia sesión.");
     return;
   }
 
@@ -548,15 +569,14 @@ async function joinIsland() {
     }
 
     if (currentPlayer) {
-      $("playerInfo").textContent = "Ya estás dentro de una isla.";
+      playerMessage("Ya estás dentro de una isla.");
       return;
     }
 
     roomCode = code;
     await ensureRoom(roomCode);
 
-    // Recupera al jugador de esta cuenta, incluso desde otro navegador.
-    const { data: existing, error: existingError } = await supabaseClient
+    const { data: existing, error: existingError } = await db
       .from("treasure_players")
       .select("*")
       .eq("room_code", roomCode)
@@ -567,73 +587,69 @@ async function joinIsland() {
 
     if (existing) {
       currentPlayer = existing;
-      localStorage.setItem(storageKey(roomCode), existing.id);
-
+      playerMessage(`Volviste a entrar como ${getRoleName(existing.role)}.`);
       await loadRoom();
-      subscribeToRoom();
-      startGameLoop();
+      connectRealtime();
+      startLoop();
       startTimer();
-
-      $("playerInfo").textContent =
-        `Has vuelto a entrar como ${existing.player_name}.`;
-      setStatus("Conectado a la isla");
+      status("Conectado a la isla");
       return;
     }
 
-    const { data: existingPlayers, error: playersError } =
-      await supabaseClient
-        .from("treasure_players")
-        .select("*")
-        .eq("room_code", roomCode);
+    const { data: roomPlayers, error: roomPlayersError } = await db
+      .from("treasure_players")
+      .select("*")
+      .eq("room_code", roomCode);
 
-    if (playersError) throw playersError;
+    if (roomPlayersError) throw roomPlayersError;
 
-    const players = existingPlayers || [];
+    const occupied = roomPlayers || [];
 
-    if (players.length >= 2) {
-      throw new Error("Esta isla ya tiene dos capitanes.");
+    if (occupied.length >= 2) {
+      throw new Error("La isla ya tiene dos jugadores.");
     }
 
-    const role = players.some((p) => p.role === "red") ? "blue" : "red";
+    if (room.status !== "waiting") {
+      throw new Error("La partida ya comenzó. Reinicia la isla para entrar.");
+    }
 
-    const newPlayer = {
+    const role = occupied.some((p) => p.role === "red") ? "blue" : "red";
+
+    const player = {
       id: crypto.randomUUID(),
       room_code: roomCode,
       player_name: name,
       role,
-      x: PLAYER_START_X,
-      y: PLAYER_START_Y,
+      x: getStartPosition(role),
+      y: GROUND_TOP - PLAYER_HEIGHT / 2,
       score: 0,
       is_ready: false,
       finished_at: null,
       user_id: currentUser.id
     };
 
-    const { data, error: insertError } = await supabaseClient
+    const { data, error } = await db
       .from("treasure_players")
-      .insert(newPlayer)
+      .insert(player)
       .select()
       .single();
 
-    if (insertError) throw insertError;
+    if (error) throw error;
 
     currentPlayer = data;
-    localStorage.setItem(storageKey(roomCode), data.id);
+
+    playerMessage(`¡Eres ${getRoleName(role)}! Tu pirata ya está en la isla.`);
+    message(`Bienvenido, ${name}. Eres ${getRoleName(role)}.`);
 
     await loadRoom();
-    subscribeToRoom();
-    startGameLoop();
+    connectRealtime();
+    startLoop();
     startTimer();
 
-    $("playerInfo").textContent =
-      `¡Entraste como Capitán ${role === "red" ? "Rojo" : "Azul"}!`;
-
-    setMessage("¡Bienvenido a la isla, " + name + "!");
-    setStatus("Conectado a la isla");
-
+    status("Conectado a la isla");
   } catch (error) {
-    $("playerInfo").textContent = error.message;
     console.error(error);
+    playerMessage(error.message);
   } finally {
     busy = false;
     $("joinButton").disabled = false;
@@ -641,134 +657,47 @@ async function joinIsland() {
 }
 
 // --------------------------------------------------
-// ABANDONAR LA ISLA
-// --------------------------------------------------
-
-async function leaveGame(showMessage = true) {
-  if (!currentPlayer) return;
-
-  const playerId = currentPlayer.id;
-  const code = roomCode;
-
-  try {
-    if (channel) {
-      await supabaseClient.removeChannel(channel);
-      channel = null;
-    }
-
-    const { error: deleteError } = await supabaseClient
-      .from("treasure_players")
-      .delete()
-      .eq("id", playerId)
-      .eq("user_id", currentUser.id);
-
-    if (deleteError) throw deleteError;
-
-    // Si alguien abandona, la sala vuelve a esperar.
-    await supabaseClient
-      .from("treasure_players")
-      .update({ is_ready: false })
-      .eq("room_code", code);
-
-    await supabaseClient
-      .from("treasure_rooms")
-      .update({
-        status: "waiting",
-        started_at: null,
-        winner_player_id: null,
-        winner_name: null,
-        winner_role: null
-      })
-      .eq("room_code", code);
-
-    currentPlayer = null;
-    roomPlayers = [];
-    roomData = null;
-    roomStatus = "waiting";
-
-    localStorage.removeItem(storageKey(code));
-
-    if (gameLoop) cancelAnimationFrame(gameLoop);
-    if (timerInterval) clearInterval(timerInterval);
-
-    $("waitingRoom").hidden = true;
-    $("finalResult").hidden = true;
-
-    if (showMessage) {
-      setMessage("Has abandonado la isla.");
-      $("playerInfo").textContent = "Puedes entrar de nuevo cuando quieras.";
-    }
-
-    setStatus("Fuera de la isla");
-  } catch (error) {
-    console.error(error);
-    if (showMessage) {
-      setMessage("No se pudo abandonar la isla: " + error.message);
-    }
-    throw error;
-  }
-}
-
-// --------------------------------------------------
-// JUGADORES LISTOS Y CUENTA REGRESIVA
+// BOTÓN ESTOY LISTO
 // --------------------------------------------------
 
 async function markReady() {
-  if (!currentPlayer || roomStatus !== "waiting") return;
+  if (!currentPlayer || !roomCode || room?.status !== "waiting") return;
 
   $("readyButton").disabled = true;
 
   try {
-    const { error } = await supabaseClient
-      .from("treasure_players")
-      .update({ is_ready: true })
-      .eq("id", currentPlayer.id)
-      .eq("user_id", currentUser.id);
+    const { error } = await db.rpc("set_player_ready", {
+      p_room_code: roomCode,
+      p_player_id: currentPlayer.id,
+      p_ready: true
+    });
 
     if (error) throw error;
 
     await loadRoom();
 
-    if (
-      roomPlayers.length === 2 &&
-      roomPlayers.every((player) => player.is_ready)
-    ) {
-      const startTime = new Date(Date.now() + 5000).toISOString();
+    message("¡Estás listo! Esperando al otro capitán.");
 
-      const { error: roomError } = await supabaseClient
-        .from("treasure_rooms")
-        .update({
-          status: "countdown",
-          started_at: startTime,
-          winner_player_id: null,
-          winner_name: null,
-          winner_role: null
-        })
-        .eq("room_code", roomCode)
-        .eq("status", "waiting");
-
-      if (roomError) throw roomError;
-
-      await loadRoom();
-      setMessage("¡La carrera comienza en 5 segundos!");
-    }
   } catch (error) {
+    console.error(error);
+    message("No se pudo marcar como listo: " + error.message);
     $("readyButton").disabled = false;
-    setMessage("No se pudo marcar como listo: " + error.message);
   }
 }
 
-async function advanceRoomState() {
-  if (!roomData || roomStatus !== "countdown" || !roomData.started_at) {
-    return;
-  }
+// --------------------------------------------------
+// CUENTA REGRESIVA
+// --------------------------------------------------
 
-  const start = new Date(roomData.started_at).getTime();
+async function checkCountdown() {
+  if (!room || room.status !== "countdown" || !room.started_at) return;
 
-  if (Date.now() >= start) {
+  const startTime = new Date(room.started_at).getTime();
+
+  if (Date.now() >= startTime) {
     const actualStart = new Date().toISOString();
 
-    const { error } = await supabaseClient
+    const { error } = await db
       .from("treasure_rooms")
       .update({
         status: "racing",
@@ -776,87 +705,33 @@ async function advanceRoomState() {
       })
       .eq("room_code", roomCode)
       .eq("status", "countdown")
-      .eq("started_at", roomData.started_at);
+      .eq("started_at", room.started_at);
 
     if (error) console.error(error);
 
     await loadRoom();
-    setMessage("¡YA! ¡Corre hacia la meta!");
+    message("¡COMIENZA LA CARRERA!");
+  } else {
+    const seconds = Math.ceil((startTime - Date.now()) / 1000);
+    $("countdownDisplay").hidden = false;
+    $("countdownDisplay").textContent = seconds;
   }
 }
 
 // --------------------------------------------------
-// MUNDO Y PERSONAJES
+// MOVIMIENTO
 // --------------------------------------------------
-
-function prepareWorld() {
-  $("world").style.width = WORLD_WIDTH + "px";
-  $("finishLine").style.left = FINISH_X + "px";
-
-  const obstacleArea = $("obstacleArea");
-  obstacleArea.innerHTML = "";
-
-  OBSTACLES.forEach((obstacle) => {
-    const item = document.createElement("div");
-    item.textContent = obstacle.icon;
-    item.style.position = "absolute";
-    item.style.left = obstacle.x + "px";
-    item.style.top = obstacle.y + "px";
-    item.style.fontSize = "34px";
-    obstacleArea.appendChild(item);
-  });
-
-  const treasureArea = $("treasureArea");
-  treasureArea.innerHTML = "";
-
-  PLATFORMS.forEach((platform) => {
-    const item = document.createElement("div");
-    item.className = "platform";
-    item.style.position = "absolute";
-    item.style.left = platform.x + "px";
-    item.style.top = platform.top + "px";
-    item.style.width = platform.width + "px";
-    treasureArea.appendChild(item);
-  });
-}
-
-function drawPirate(element, player) {
-  if (!player) {
-    element.style.display = "none";
-    return;
-  }
-
-  element.style.display = "block";
-  element.style.left = Number(player.x) + "px";
-  element.style.top = Number(player.y) + "px";
-}
-
-function updateCamera() {
-  if (!currentPlayer) return;
-
-  const island = $("island");
-  const x = Number(currentPlayer.x || 0);
-
-  const cameraX = Math.max(
-    0,
-    Math.min(
-      WORLD_WIDTH - island.clientWidth,
-      x - island.clientWidth / 2
-    )
-  );
-
-  $("world").style.transform = `translateX(${-cameraX}px)`;
-}
 
 function jump() {
-  if (!currentPlayer || roomStatus !== "racing" || !grounded) return;
+  if (!currentPlayer || room?.status !== "racing") return;
+  if (!grounded) return;
 
   velocityY = JUMP_FORCE;
   grounded = false;
 }
 
 function movePlayer(delta) {
-  if (!currentPlayer || roomStatus !== "racing") return;
+  if (!currentPlayer || room?.status !== "racing") return;
   if (currentPlayer.finished_at) return;
 
   const factor = Math.min(delta / 16.67, 2);
@@ -864,17 +739,12 @@ function movePlayer(delta) {
   let x = Number(currentPlayer.x);
   let y = Number(currentPlayer.y);
 
-  if (pressedKeys.has("ArrowLeft") || pressedKeys.has("a")) {
-    x -= PLAYER_SPEED * factor;
-  }
+  if (keys.has("ArrowLeft") || keys.has("a")) x -= SPEED * factor;
+  if (keys.has("ArrowRight") || keys.has("d")) x += SPEED * factor;
 
-  if (pressedKeys.has("ArrowRight") || pressedKeys.has("d")) {
-    x += PLAYER_SPEED * factor;
-  }
+  x = Math.max(24, Math.min(WORLD_WIDTH - 24, x));
 
-  x = Math.max(0, Math.min(WORLD_WIDTH - 45, x));
-
-  const oldBottom = y + 42;
+  const oldBottom = y + PLAYER_HEIGHT / 2;
 
   velocityY += GRAVITY * factor;
   y += velocityY * factor;
@@ -884,17 +754,17 @@ function movePlayer(delta) {
   if (velocityY >= 0) {
     for (const platform of PLATFORMS) {
       const overlaps =
-        x + 38 > platform.x &&
-        x < platform.x + platform.width;
+        x + 20 > platform.x &&
+        x - 20 < platform.x + platform.width;
 
-      const newBottom = y + 42;
+      const newBottom = y + PLAYER_HEIGHT / 2;
 
       if (
         overlaps &&
         oldBottom <= platform.top &&
         newBottom >= platform.top
       ) {
-        y = platform.top - 42;
+        y = platform.top - PLAYER_HEIGHT / 2;
         velocityY = 0;
         landed = true;
         break;
@@ -902,8 +772,8 @@ function movePlayer(delta) {
     }
   }
 
-  if (!landed && y + 42 >= GROUND_TOP) {
-    y = GROUND_TOP - 42;
+  if (!landed && y + PLAYER_HEIGHT / 2 >= GROUND_TOP) {
+    y = GROUND_TOP - PLAYER_HEIGHT / 2;
     velocityY = 0;
     landed = true;
   }
@@ -913,84 +783,70 @@ function movePlayer(delta) {
   currentPlayer.x = x;
   currentPlayer.y = y;
 
-  const element =
-    currentPlayer.role === "red" ? $("pirateA") : $("pirateB");
-
+  const element = currentPlayer.role === "red" ? $("pirateA") : $("pirateB");
   drawPirate(element, currentPlayer);
   updateCamera();
 
   if (x >= FINISH_X) {
-    markFinished();
+    finishRace();
   }
 }
 
 async function savePosition() {
-  if (
-    !currentPlayer ||
-    savingPosition ||
-    roomStatus !== "racing"
-  ) return;
+  if (!currentPlayer || room?.status !== "racing") return;
 
-  savingPosition = true;
+  const { error } = await db
+    .from("treasure_players")
+    .update({
+      x: currentPlayer.x,
+      y: currentPlayer.y
+    })
+    .eq("id", currentPlayer.id)
+    .eq("user_id", currentUser.id);
 
-  try {
-    const { error } = await supabaseClient
-      .from("treasure_players")
-      .update({
-        x: currentPlayer.x,
-        y: currentPlayer.y
-      })
-      .eq("id", currentPlayer.id)
-      .eq("user_id", currentUser.id);
-
-    if (error) console.error("Error guardando posición:", error);
-  } finally {
-    savingPosition = false;
-  }
+  if (error) console.error("Error guardando posición:", error);
 }
 
-function gameFrame(timestamp) {
-  if (!lastFrameTime) lastFrameTime = timestamp;
+function frame(timestamp) {
+  if (!lastFrame) lastFrame = timestamp;
 
-  const delta = timestamp - lastFrameTime;
-  lastFrameTime = timestamp;
+  const delta = timestamp - lastFrame;
+  lastFrame = timestamp;
 
-  if (currentPlayer && roomStatus === "racing") {
+  if (currentPlayer && room?.status === "racing") {
     movePlayer(delta);
 
-    if (timestamp - lastSaveTime > SAVE_INTERVAL) {
-      lastSaveTime = timestamp;
+    if (timestamp - lastPositionSave > 120) {
+      lastPositionSave = timestamp;
       savePosition();
     }
   }
 
-  gameLoop = requestAnimationFrame(gameFrame);
+  loopId = requestAnimationFrame(frame);
 }
 
-function startGameLoop() {
-  if (gameLoop) cancelAnimationFrame(gameLoop);
-
-  lastFrameTime = 0;
-  gameLoop = requestAnimationFrame(gameFrame);
+function startLoop() {
+  if (loopId) cancelAnimationFrame(loopId);
+  lastFrame = 0;
+  loopId = requestAnimationFrame(frame);
 }
 
 // --------------------------------------------------
-// GANADOR Y RESULTADO PARA LOS DOS JUGADORES
+// FINALIZAR CARRERA
 // --------------------------------------------------
 
-async function markFinished() {
+async function finishRace() {
   if (
-    !currentPlayer ||
     finishing ||
+    !currentPlayer ||
     currentPlayer.finished_at ||
-    roomStatus !== "racing"
+    room?.status !== "racing"
   ) return;
 
   finishing = true;
-  setMessage("¡Llegaste a la meta! Comprobando quién ganó...");
 
   try {
-    const { error: playerError } = await supabaseClient
+    const { error: playerError } = await db
       .from("treasure_players")
       .update({ finished_at: new Date().toISOString() })
       .eq("id", currentPlayer.id)
@@ -998,67 +854,88 @@ async function markFinished() {
 
     if (playerError) throw playerError;
 
-    const { error: winnerError } = await supabaseClient.rpc(
-      "claim_race_winner",
-      {
-        p_room_code: roomCode,
-        p_player_id: currentPlayer.id
-      }
-    );
+    const { error: winnerError } = await db.rpc("claim_race_winner", {
+      p_room_code: roomCode,
+      p_player_id: currentPlayer.id
+    });
 
     if (winnerError) throw winnerError;
 
     await loadRoom();
-    renderFinalResult();
     await saveMatchResult();
+    drawResult();
 
   } catch (error) {
     console.error(error);
-    setMessage("Hubo un problema guardando el resultado: " + error.message);
+    message("Error al guardar el ganador: " + error.message);
   } finally {
     finishing = false;
   }
 }
 
-function renderFinalResult() {
-  if (!roomData || roomStatus !== "finished") {
+function drawResult() {
+  if (!room || room.status !== "finished") {
     $("finalResult").hidden = true;
     return;
   }
 
   $("finalResult").hidden = false;
 
-  const winnerId = roomData.winner_player_id;
-
-  if (!winnerId) {
+  if (!room.winner_player_id) {
     $("winnerMessage").textContent =
-      "¡Se acabó el tiempo! La carrera terminó sin ganador.";
-    setMessage("¡Se acabó el tiempo!");
+      "Se terminó el tiempo. La carrera terminó sin ganador.";
     return;
   }
 
-  const winner = roomPlayers.find((p) => p.id === winnerId);
-  const winnerName =
-    roomData.winner_name || winner?.player_name || "Un capitán";
+  const winner = players.find((p) => p.id === room.winner_player_id);
+  const winnerName = room.winner_name || winner?.player_name || "Un jugador";
 
-  if (currentPlayer && winnerId === currentPlayer.id) {
-    $("winnerMessage").textContent =
-      "🎉 ¡GANASTE! Llegaste primero a la meta.";
-    setMessage("¡GANASTE! Eres el gran capitán de la isla.");
+  if (currentPlayer?.id === room.winner_player_id) {
+    $("winnerMessage").textContent = "🎉 ¡FELICIDADES! ¡GANASTE LA CARRERA!";
+    message("¡Ganaste! Eres el gran capitán del tesoro.");
   } else {
-    $("winnerMessage").textContent =
-      `¡PERDISTE! ${winnerName} llegó primero a la meta.`;
-    setMessage(`¡PERDISTE! Ganó ${winnerName}.`);
+    $("winnerMessage").textContent = `🏆 El ganador es ${winnerName}.`;
+    message(`La carrera terminó. Ganó ${winnerName}.`);
   }
 }
 
-async function finishByTime() {
-  if (endingByTime || roomStatus !== "racing") return;
+// --------------------------------------------------
+// TEMPORIZADOR
+// --------------------------------------------------
 
-  endingByTime = true;
+function updateTimer() {
+  if (!room || !room.started_at) {
+    $("timerDisplay").textContent = "05:00";
+    $("countdownDisplay").hidden = true;
+    return;
+  }
+
+  if (room.status === "countdown") {
+    checkCountdown();
+    return;
+  }
+
+  $("countdownDisplay").hidden = true;
+
+  if (room.status !== "racing") return;
+
+  const elapsed = (Date.now() - new Date(room.started_at).getTime()) / 1000;
+  const remaining = Math.max(0, Math.ceil(GAME_SECONDS - elapsed));
+
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+
+  $("timerDisplay").textContent =
+    `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
+  if (remaining <= 0) finishByTime();
+}
+
+async function finishByTime() {
+  if (room?.status !== "racing") return;
 
   try {
-    const { error } = await supabaseClient
+    const { error } = await db
       .from("treasure_rooms")
       .update({ status: "finished" })
       .eq("room_code", roomCode)
@@ -1067,84 +944,38 @@ async function finishByTime() {
     if (error) throw error;
 
     await loadRoom();
-    renderFinalResult();
+    drawResult();
   } catch (error) {
-    console.error("Error al terminar por tiempo:", error);
-  } finally {
-    endingByTime = false;
-  }
-}
-
-// --------------------------------------------------
-// TEMPORIZADOR
-// --------------------------------------------------
-
-function updateTimerDisplay() {
-  if (!roomData || !roomData.started_at) {
-    $("timerDisplay").textContent = "05:00";
-    $("countdownDisplay").hidden = true;
-    return;
-  }
-
-  if (roomStatus === "countdown") {
-    const seconds = Math.max(
-      0,
-      Math.ceil(
-        (new Date(roomData.started_at).getTime() - Date.now()) / 1000
-      )
-    );
-
-    $("countdownDisplay").hidden = seconds <= 0;
-    $("countdownDisplay").textContent = seconds;
-    return;
-  }
-
-  $("countdownDisplay").hidden = true;
-
-  if (roomStatus !== "racing") return;
-
-  const elapsed =
-    (Date.now() - new Date(roomData.started_at).getTime()) / 1000;
-
-  const remaining = Math.max(0, Math.ceil(GAME_DURATION - elapsed));
-
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
-
-  $("timerDisplay").textContent =
-    `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-
-  if (remaining <= 0) {
-    finishByTime();
+    console.error(error);
   }
 }
 
 function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
+  if (timerId) clearInterval(timerId);
 
-  timerInterval = setInterval(async () => {
+  timerId = setInterval(async () => {
     if (!currentPlayer) return;
 
-    if (roomStatus === "countdown") {
-      await advanceRoomState();
+    if (room?.status === "countdown") {
+      await checkCountdown();
     }
 
-    updateTimerDisplay();
-  }, 250);
+    updateTimer();
+  }, 500);
 }
 
 // --------------------------------------------------
-// ACTUALIZACIONES EN TIEMPO REAL
+// ACTUALIZACIÓN MULTIJUGADOR
 // --------------------------------------------------
 
-function subscribeToRoom() {
+function connectRealtime() {
   if (channel) {
-    supabaseClient.removeChannel(channel);
+    db.removeChannel(channel);
     channel = null;
   }
 
-  channel = supabaseClient
-    .channel("treasure-room-" + roomCode)
+  channel = db
+    .channel("isla-" + roomCode)
     .on(
       "postgres_changes",
       {
@@ -1153,9 +984,13 @@ function subscribeToRoom() {
         table: "treasure_players",
         filter: `room_code=eq.${roomCode}`
       },
-      async () => {
+      async (payload) => {
         try {
           await loadRoom();
+
+          if (payload.new?.id === currentPlayer?.id) {
+            currentPlayer = players.find((p) => p.id === currentPlayer.id) || currentPlayer;
+          }
         } catch (error) {
           console.error(error);
         }
@@ -1177,41 +1012,50 @@ function subscribeToRoom() {
         }
       }
     )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        setStatus("Conectado · Multijugador activo");
+    .subscribe((state) => {
+      if (state === "SUBSCRIBED") {
+        status("Multijugador conectado");
       }
     });
 }
 
 // --------------------------------------------------
-// REINICIAR LA CARRERA
+// REINICIAR Y SALIR
 // --------------------------------------------------
 
 async function restartGame() {
-  if (!currentPlayer || !roomCode) return;
+  if (!currentPlayer) return;
 
-  const confirmed = confirm(
-    "¿Quieres reiniciar la carrera para los dos jugadores?"
-  );
-
-  if (!confirmed) return;
+  if (!confirm("¿Reiniciar la carrera para los dos jugadores?")) return;
 
   try {
-    const { error: playersError } = await supabaseClient
+    const { error: playerError } = await db
       .from("treasure_players")
       .update({
-        x: PLAYER_START_X,
-        y: PLAYER_START_Y,
+        x: null,
+        y: null,
         score: 0,
         is_ready: false,
         finished_at: null
       })
       .eq("room_code", roomCode);
 
-    if (playersError) throw playersError;
+    if (playerError) throw playerError;
 
-    const { error: roomError } = await supabaseClient
+    // Restablecer cada posición según el color.
+    for (const p of players) {
+      const { error } = await db
+        .from("treasure_players")
+        .update({
+          x: getStartPosition(p.role),
+          y: GROUND_TOP - PLAYER_HEIGHT / 2
+        })
+        .eq("id", p.id);
+
+      if (error) throw error;
+    }
+
+    const { error: roomError } = await db
       .from("treasure_rooms")
       .update({
         status: "waiting",
@@ -1225,73 +1069,97 @@ async function restartGame() {
     if (roomError) throw roomError;
 
     velocityY = 0;
-    grounded = false;
-    lastHistoryRaceKey = "";
+    grounded = true;
+    lastSavedRace = "";
 
     await loadRoom();
-
     $("finalResult").hidden = true;
-    $("countdownDisplay").hidden = true;
     $("timerDisplay").textContent = "05:00";
 
-    setMessage(
-      "Carrera reiniciada. Los dos jugadores deben volver a estar listos."
-    );
+    message("Partida reiniciada. Los dos jugadores deben volver a estar listos.");
   } catch (error) {
-    setMessage("No se pudo reiniciar: " + error.message);
+    message("No se pudo reiniciar: " + error.message);
+    console.error(error);
+  }
+}
+
+async function leaveIsland(showText = true) {
+  if (!currentPlayer) return;
+
+  const id = currentPlayer.id;
+
+  try {
+    if (channel) {
+      await db.removeChannel(channel);
+      channel = null;
+    }
+
+    const { error } = await db
+      .from("treasure_players")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", currentUser.id);
+
+    if (error) throw error;
+
+    await db
+      .from("treasure_rooms")
+      .update({
+        status: "waiting",
+        started_at: null,
+        winner_player_id: null,
+        winner_name: null,
+        winner_role: null
+      })
+      .eq("room_code", roomCode);
+
+    currentPlayer = null;
+    players = [];
+    room = null;
+
+    if (loopId) cancelAnimationFrame(loopId);
+    if (timerId) clearInterval(timerId);
+
+    $("pirateA").style.display = "none";
+    $("pirateB").style.display = "none";
+    $("waitingRoom").hidden = true;
+    $("finalResult").hidden = true;
+
+    if (showText) {
+      playerMessage("Has salido de la isla.");
+      message("Puedes volver a entrar cuando quieras.");
+    }
+
+    status("Fuera de la isla");
+  } catch (error) {
+    console.error(error);
+    if (showText) message("No se pudo salir: " + error.message);
+    throw error;
   }
 }
 
 // --------------------------------------------------
-// CONTROLES
+// CONTROLES DEL JUEGO
 // --------------------------------------------------
 
 function setupControls() {
+  $("signUpButton").addEventListener("click", register);
+  $("loginButton").addEventListener("click", login);
+  $("logoutButton").addEventListener("click", logout);
+
   $("joinButton").addEventListener("click", joinIsland);
   $("readyButton").addEventListener("click", markReady);
   $("restartButton").addEventListener("click", restartGame);
-  $("leaveButton").addEventListener("click", () => leaveGame(true));
-
-  $("signUpButton").addEventListener("click", signUp);
-  $("loginButton").addEventListener("click", signIn);
-  $("logoutButton").addEventListener("click", signOut);
-
-  document.querySelectorAll("[data-move]").forEach((button) => {
-    button.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-
-      const direction = button.dataset.move;
-
-      if (direction === "up") {
-        jump();
-      } else if (direction === "left") {
-        pressedKeys.add("ArrowLeft");
-      } else if (direction === "right") {
-        pressedKeys.add("ArrowRight");
-      }
-    });
-
-    const release = () => {
-      pressedKeys.delete("ArrowLeft");
-      pressedKeys.delete("ArrowRight");
-    };
-
-    button.addEventListener("pointerup", release);
-    button.addEventListener("pointerleave", release);
-    button.addEventListener("pointercancel", release);
-  });
+  $("leaveButton").addEventListener("click", () => leaveIsland(true));
 
   window.addEventListener("keydown", (event) => {
-    const key =
-      event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
 
-    if (
-      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)
-    ) {
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) {
       event.preventDefault();
     }
 
-    pressedKeys.add(key);
+    keys.add(key);
 
     if (event.key === "ArrowUp" || event.key === " ") {
       jump();
@@ -1299,38 +1167,58 @@ function setupControls() {
   });
 
   window.addEventListener("keyup", (event) => {
-    const key =
-      event.key.length === 1 ? event.key.toLowerCase() : event.key;
-
-    pressedKeys.delete(key);
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    keys.delete(key);
   });
 
-  window.addEventListener("blur", () => {
-    pressedKeys.clear();
+  window.addEventListener("blur", () => keys.clear());
+
+  document.querySelectorAll("[data-move]").forEach((button) => {
+    const direction = button.dataset.move;
+
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+
+      if (direction === "up") jump();
+      if (direction === "left") keys.add("ArrowLeft");
+      if (direction === "right") keys.add("ArrowRight");
+    });
+
+    const release = () => {
+      keys.delete("ArrowLeft");
+      keys.delete("ArrowRight");
+    };
+
+    button.addEventListener("pointerup", release);
+    button.addEventListener("pointerleave", release);
+    button.addEventListener("pointercancel", release);
   });
 }
 
 // --------------------------------------------------
-// INICIO DEL PROGRAMA
+// INICIO
 // --------------------------------------------------
 
-async function initGame() {
-  prepareWorld();
+async function startApplication() {
+  buildWorld();
   setupControls();
+
+  // Los dos piratas empiezan ocultos hasta que entren los jugadores.
+  $("pirateA").style.display = "none";
+  $("pirateB").style.display = "none";
+  $("waitingRoom").hidden = true;
+
   startTimer();
 
-  setStatus("Conectando con Supabase...");
-
   try {
-    await initializeAuth();
-    setStatus("Conectado a Supabase");
+    status("Conectando...");
+    await initAuth();
+    status("Conectado a Supabase");
   } catch (error) {
     console.error(error);
-    setStatus("No se pudo conectar");
-    setAuthMessage("Error al iniciar: " + error.message);
+    status("Error de conexión");
+    authMessage("No se pudo iniciar la aplicación: " + error.message);
   }
-
-  renderPlayers();
 }
 
-document.addEventListener("DOMContentLoaded", initGame);
+document.addEventListener("DOMContentLoaded", startApplication);
