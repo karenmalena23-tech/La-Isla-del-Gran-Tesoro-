@@ -594,6 +594,10 @@ function startGameLoop() {
 /* FINAL DE CARRERA */
 
 async function finishRace() {
+
+/* FINAL DE CARRERA */
+
+async function finishRace() {
   if (ending || !me) return;
 
   ending = true;
@@ -602,73 +606,26 @@ async function finishRace() {
     .update({ finished_at: new Date().toISOString() })
     .eq("id", me.id);
 
-  const { error } = await db.rpc("claim_race_winner", {
+  const { data, error } = await db.rpc("claim_race_winner", {
     p_room_code: code,
     p_player_id: me.id
   });
 
-  if (error) say("gameMessage", error.message);
-
-  await loadRoom();
-  ending = false;
-}
-
-async function saveResult() {
-  if (!user || !me || room?.winner_player_id !== me.id || saving) return;
-
-  const red = players.find(p => p.role === "red");
-  const blue = players.find(p => p.role === "blue");
-
-  if (!red || !blue || !red.user_id || !blue.user_id) return;
-
-  saving = true;
-
-  try {
-    const { error } = await db.from("treasure_match_history").insert({
-      room_code: code,
-      race_started_at: room.started_at,
-      red_player_name: red.player_name,
-      blue_player_name: blue.player_name,
-      red_user_id: red.user_id,
-      blue_user_id: blue.user_id,
-      winner_player_id: me.id,
-      winner_user_id: user.id,
-      winner_name: me.player_name,
-      winner_role: me.role
-    });
-
-    if (error && error.code !== "23505") throw error;
-
-    const { error: winError } = await db.from("treasure_wins").insert({
-      user_id: user.id,
-      room_code: code,
-      player_name: me.player_name
-    });
-
-    if (winError && winError.code !== "23505") {
-      console.error(winError);
-    }
-
-    await loadPersonalWins();
-    await loadHistory();
-
-  } catch (e) {
-    console.error("No se pudo guardar el resultado:", e);
-  } finally {
-    saving = false;
+  if (error) {
+    say("gameMessage", error.message);
+    ending = false;
+    return;
   }
-}
 
-function showResult() {
-  $("finalResult").hidden = false;
+  const result = data?.winner_player_id || data?.winner?.id;
+  const iWon = result === me.id;
 
-  if (!room.winner_player_id) {
-    say("winnerMessage", "⏰ Se acabó el tiempo. Lo sentimos, has perdido.");
-  } else if (room.winner_player_id === me?.id) {
-    say("winnerMessage", "🎉 ¡GANASTE! ¡Encontraste el gran tesoro!");
-  } else {
-    say("winnerMessage", `😔 Has perdido. Ganó ${room.winner_name}.`);
-  }
+  document.getElementById("finalResult").hidden = false;
+  document.getElementById("winnerMessage").textContent =
+    iWon ? "🏆 ¡GANASTE! ¡Encontraste el gran tesoro!" :
+           "😢 ¡PERDISTE! El otro pirata llegó primero.";
+
+  say("gameMessage", iWon ? "¡Eres el campeón de la isla!" : "¡El otro pirata ganó la carrera!");
 }
 
 /* REINICIAR */
