@@ -1,58 +1,78 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#123b35">
-  <title>Treasure Island | Aventura Pirata</title>
+  <title>La Isla del Gran Tesoro</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="game.js" defer></script>
 </head>
+
 <body>
   <header class="header">
     <div>
       <p class="eyebrow">AVENTURA MULTIJUGADOR</p>
-      <h1>🏝️ Treasure Island</h1>
-      <p class="subtitle">¡Explora la selva y encuentra el gran tesoro!</p>
+      <h1>🏝️ La Isla del Gran Tesoro</h1>
+      <p class="subtitle">¡Compite con otro capitán y llega primero a la meta!</p>
     </div>
     <div id="connectionStatus" class="status">Preparando aventura...</div>
   </header>
 
   <main class="container">
 
-    <section class="panel setup-panel">
-      <h2>🔐 Cuenta de jugador</h2>
-      <p id="authStatus" class="helper">Inicia sesión o crea una cuenta para guardar tus victorias.</p>
+    <section class="panel" id="authPanel">
+      <h2>👤 Tu cuenta</h2>
+      <p>Crea tu cuenta o inicia sesión para guardar tus victorias.</p>
 
-      <label for="authEmail">Correo electrónico</label>
-      <input id="authEmail" type="email" autocomplete="email" placeholder="tu-correo@ejemplo.com">
+      <label for="emailInput">Correo electrónico</label>
+      <input id="emailInput" type="email"
+             autocomplete="email" placeholder="jugador@ejemplo.com">
 
-      <label for="authPassword">Contraseña</label>
-      <input id="authPassword" type="password" autocomplete="current-password" placeholder="Mínimo 6 caracteres">
+      <label for="passwordInput">Contraseña</label>
+      <input id="passwordInput" type="password"
+             autocomplete="current-password" placeholder="Mínimo 6 caracteres">
 
       <div class="auth-buttons">
-        <button id="loginButton" class="primary-button" type="button">Iniciar sesión</button>
-        <button id="signupButton" type="button">Crear cuenta</button>
-        <button id="logoutButton" type="button" hidden>Cerrar sesión</button>
+        <button id="signUpButton" class="primary-button" type="button">
+          Crear cuenta
+        </button>
+        <button id="loginButton" type="button">
+          Iniciar sesión
+        </button>
+      </div>
+
+      <p id="authStatus" class="helper" role="status">
+        Inicia sesión para entrar a la isla.
+      </p>
+
+      <div id="loggedInArea" hidden>
+        <p>Sesión iniciada: <strong id="accountEmail"></strong></p>
+        <button id="logoutButton" type="button">Cerrar sesión</button>
       </div>
     </section>
 
     <section class="panel setup-panel">
       <h2>⚓ Tu expedición</h2>
+
       <label for="playerName">Nombre del pirata</label>
       <input id="playerName" maxlength="20" placeholder="Ej. Capitán Ana">
 
       <label for="roomCode">Código de la isla</label>
       <input id="roomCode" maxlength="30" value="isla-principal">
 
-      <button id="joinButton" class="primary-button" type="button" disabled>
+      <button id="joinButton" class="primary-button" type="button">
         Entrar a la isla
       </button>
-      <p id="playerInfo" class="helper">Inicia sesión para entrar a jugar.</p>
+
+      <p id="playerInfo" class="helper">
+        Inicia sesión, escribe tu nombre y entra a jugar.
+      </p>
     </section>
 
-    <section id="waitingRoom" class="panel waiting-room">
+    <section id="waitingRoom" class="panel waiting-room" hidden>
       <h2>⚓ Sala de espera</h2>
       <p>Los dos capitanes deben estar listos para comenzar.</p>
 
@@ -70,16 +90,18 @@
       <button id="readyButton" class="primary-button" type="button" disabled>
         ¡Estoy listo!
       </button>
+
       <p id="readyMessage" class="helper">Entra a la isla para prepararte.</p>
       <div id="countdownDisplay" class="countdown" hidden>5</div>
     </section>
 
     <section class="game-layout">
       <div class="panel island-panel">
+
         <div class="section-heading">
           <div>
-            <h2>🗺️ Aventura en la selva</h2>
-            <p>Corre, salta y llega primero a la meta.</p>
+            <h2>🗺️ Carrera por la isla</h2>
+            <p>Salta las plataformas y llega primero a la meta.</p>
           </div>
           <span class="map-tag">ISLA 01</span>
         </div>
@@ -87,7 +109,6 @@
         <div id="island" class="island" aria-label="Aventura de la isla">
           <div id="world" class="game-world">
             <div class="world-background"></div>
-
             <div class="world-decoration decoration-one">🌴</div>
             <div class="world-decoration decoration-two">🌴</div>
             <div class="world-decoration decoration-three">🌳</div>
@@ -102,16 +123,17 @@
 
             <div id="obstacleArea"></div>
             <div id="treasureArea"></div>
-
             <div id="finishLine" class="finish-line">🏁 META</div>
 
-            <div id="pirateA" class="pirate pirate-red" title="Capitán rojo">🏴‍☠️</div>
-            <div id="pirateB" class="pirate pirate-blue" title="Capitán azul">🏴‍☠️</div>
+            <div id="pirateA" class="pirate pirate-red"
+                 title="Capitán rojo">🏴‍☠️</div>
+            <div id="pirateB" class="pirate pirate-blue"
+                 title="Capitán azul">🏴‍☠️</div>
           </div>
         </div>
 
         <p class="helper">
-          Usa las flechas o WASD para explorar. La cámara seguirá a tu capitán.
+          Usa las flechas o WASD para moverte. Pulsa espacio o ⬆️ para saltar.
         </p>
 
         <div class="controls">
@@ -121,9 +143,6 @@
             <button data-move="down" type="button">⬇️</button>
             <button data-move="right" type="button">➡️</button>
           </div>
-          <button id="findTreasureButton" class="treasure-button" type="button" hidden>
-            🔎 Buscar tesoro
-          </button>
         </div>
 
         <div class="game-options">
@@ -132,11 +151,13 @@
           <button id="leaveButton" type="button">🚪 Abandonar partida</button>
         </div>
 
-        <p id="gameMessage" class="message" role="status">¡Bienvenido a la isla!</p>
+        <p id="gameMessage" class="message" role="status">
+          ¡Bienvenido a la isla!
+        </p>
       </div>
 
       <aside class="panel scoreboard">
-        <h2>🏆 Marcador de carrera</h2>
+        <h2>🏆 Marcador de la carrera</h2>
 
         <div class="score-card red-card">
           <div class="player-symbol">🏴‍☠️</div>
@@ -156,18 +177,33 @@
           <strong id="scoreB">0</strong>
         </div>
 
-        <h3 class="activity-title">🏁 Resultado</h3>
+        <h3 class="activity-title">📜 Estado de los jugadores</h3>
+        <ul id="activityList" class="activity-list">
+          <li>Esperando a los capitanes...</li>
+        </ul>
+
         <div id="finalResult" class="final-result" hidden>
-          <h2>🏆 Resultado final</h2>
+          <h2>🏆 Resultado de la carrera</h2>
           <p id="winnerMessage"></p>
         </div>
-
-        <h3 class="activity-title">📜 Mi historial de victorias</h3>
-        <p>Victorias totales: <strong id="winCount">0</strong></p>
-        <ul id="historyList" class="activity-list">
-          <li>Inicia sesión para consultar tu historial.</li>
-        </ul>
       </aside>
+    </section>
+
+    <section class="panel">
+      <h2>🏅 Mi historial de victorias</h2>
+      <p>Este historial pertenece a tu cuenta.</p>
+      <p>Victorias totales: <strong id="totalWins">0</strong></p>
+      <ul id="historyList">
+        <li>Inicia sesión para consultar tu historial.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>📚 Historial compartido de carreras</h2>
+      <p>Los dos jugadores pueden consultar el resultado de las carreras que compartieron.</p>
+      <ul id="matchHistoryList">
+        <li>Entra a una isla para consultar las carreras.</li>
+      </ul>
     </section>
 
     <section class="panel instructions">
@@ -175,17 +211,29 @@
       <ol>
         <li>Crea una cuenta o inicia sesión.</li>
         <li>Escribe tu nombre y entra a la isla.</li>
-        <li>Comparte el código con el otro jugador.</li>
+        <li>Comparte el código de la isla con el otro jugador.</li>
         <li>Los dos capitanes deben marcar que están listos.</li>
-        <li>Cuando termine la cuenta regresiva, corre y salta.</li>
-        <li>Gana quien llegue primero a la meta antes de que termine el tiempo.</li>
-        <li>Tu historial guardará las victorias de tu cuenta.</li>
+        <li>Cuando termine la cuenta regresiva, comienza la carrera.</li>
+        <li>Usa las flechas o WASD para moverte y saltar.</li>
+        <li>Gana quien llegue primero a la meta.</li>
       </ol>
     </section>
+
+    <section class="panel">
+      <h2>📝 Qué te falta para Proyecto 2</h2>
+      <p>
+        Para Proyecto 2 me falta integrar el inicio de sesión con correo
+        electrónico y contraseña. Empezaré configurando Supabase Auth para
+        que cada jugador pueda crear su propia cuenta. Después vincularé
+        las partidas ganadas a cada usuario y mostraré un marcador compartido
+        para que los dos jugadores puedan consultar quién ganó cada carrera.
+      </p>
+    </section>
+
   </main>
 
   <footer>
-    Treasure Island · Laboratorio 4 · Proyecto educativo
+    La Isla del Gran Tesoro · Proyecto educativo
   </footer>
 </body>
 </html>
