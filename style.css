@@ -1,5 +1,7 @@
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -30,7 +32,10 @@ header p { color: #d8e9d9; }
   color: #f4ca70;
 }
 
-main { width: min(1000px,94%); margin: 25px auto; }
+main {
+  width: min(1000px,94%);
+  margin: 25px auto;
+}
 
 .panel {
   background: #1b4039;
@@ -74,21 +79,25 @@ button:hover { filter: brightness(1.1); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .gold { background: #e5b653; color: #30230d; }
 
-#authStatus,#playerInfo,#readyMessage {
+#authStatus,
+#playerInfo,
+#readyMessage {
   color: #c8d9c9;
   line-height: 1.5;
 }
 
 #loggedInArea { margin-top: 12px; }
 
-.ready-grid,.score-grid {
+.ready-grid,
+.score-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin: 15px 0;
 }
 
-.ready-grid > div,.score-grid > div {
+.ready-grid > div,
+.score-grid > div {
   padding: 17px;
   border-radius: 12px;
 }
@@ -115,7 +124,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .game-heading p { color: #c8d9c9; }
 #timerDisplay { font-size: 27px; color: #f4ca70; }
 
-/* ESCENARIO */
+/* ISLA */
 #island {
   position: relative;
   height: 300px;
@@ -131,6 +140,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   );
 }
 
+/* MUNDO QUE SE DESPLAZA */
 #world {
   position: absolute;
   width: 4200px;
@@ -140,9 +150,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   will-change: transform;
 }
 
-/* Decoración del fondo */
+/* DECORACIÓN DEL FONDO */
 .scenery {
   position: absolute;
+  z-index: 1;
   top: 35px;
   left: 30px;
   width: 4000px;
@@ -151,12 +162,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   pointer-events: none;
 }
 
-/* SUPERFICIE DEL SUELO */
+/* SUELO */
 .ground {
   position: absolute;
   z-index: 2;
-  bottom: 0;
   left: 0;
+  bottom: 0;
   width: 100%;
   height: 55px;
   background: linear-gradient(
@@ -168,38 +179,51 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   border-top: 4px solid #b2d76b;
 }
 
-/* OBSTÁCULOS: se apoyan sobre el suelo */
+/*
+  OBSTÁCULOS:
+  bottom: 38px hace que se introduzcan un poco
+  en el suelo y no parezcan flotantes.
+*/
 .obstacle {
   position: absolute;
-  z-index: 3;
-  bottom: 55px;
+  z-index: 4;
+  bottom: 38px;
+  width: 52px;
+  height: 58px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   line-height: 1;
-  font-size: 42px;
-  height: 48px;
+  font-size: 48px;
+  padding: 0;
+  margin: 0;
   transform: translateX(-50%);
+  pointer-events: none;
 }
 
 /* COFRES */
 .chest {
   position: absolute;
-  z-index: 3;
-  bottom: 55px;
-  width: 42px;
-  height: 42px;
+  z-index: 4;
+  bottom: 38px;
+  width: 46px;
+  height: 48px;
   display: grid;
   place-items: center;
-  font-size: 34px;
+  font-size: 38px;
+  line-height: 1;
   transform: translateX(-50%);
-  cursor: default;
+  pointer-events: none;
 }
 
-/* META */
+.chest.collected {
+  display: none;
+}
+
+/* LÍNEA DE META */
 #finishLine {
   position: absolute;
-  z-index: 3;
+  z-index: 4;
   left: 4050px;
   bottom: 55px;
   background: #fff4cf;
@@ -212,7 +236,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 /* PIRATAS */
 .pirate {
   position: absolute;
-  z-index: 4;
+  z-index: 6;
   width: 48px;
   height: 48px;
   bottom: 55px;
@@ -228,7 +252,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .pirate.red { background: #d84b42; }
 .pirate.blue { background: #347ed0; }
 
-.controls,.actions {
+.controls,
+.actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -238,7 +263,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .controls button { min-width: 75px; }
 
-.message,.result {
+.message,
+.result {
   background: #102f2b;
   color: #f4ca70;
   padding: 14px;
@@ -253,13 +279,19 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 }
 
 li { margin: 8px 0; color: #d8e9d9; }
-footer { text-align: center; padding: 25px; color: #a8c4b1; }
+
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #a8c4b1;
+}
 
 [hidden] { display: none !important; }
 
 @media(max-width:600px) {
   header { padding: 22px 5%; }
   .panel { padding: 16px; }
-  .ready-grid,.score-grid { grid-template-columns: 1fr; }
+  .ready-grid,
+  .score-grid { grid-template-columns: 1fr; }
   .game-heading { align-items: flex-start; }
 }
