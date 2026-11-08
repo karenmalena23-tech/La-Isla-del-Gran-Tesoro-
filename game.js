@@ -470,13 +470,14 @@ async function loadRoom() {
 // --------------------------------------------------
 // DIBUJAR JUGADORES Y SALA DE ESPERA
 // --------------------------------------------------
-
-function drawPlayers() {
-  const red = players.find((p) => p.role === "red");
-  const blue = players.find((p) => p.role === "blue");
+function drawPirate(element, player) {
+  function drawPlayers() {
+  const red = players.find(p => p.role === "red");
+  const blue = players.find(p => p.role === "blue");
 
   $("nameA").textContent = red?.player_name || "Pirata Rojo";
   $("nameB").textContent = blue?.player_name || "Pirata Azul";
+
   $("scoreA").textContent = red?.score ?? 0;
   $("scoreB").textContent = blue?.score ?? 0;
 
@@ -486,28 +487,19 @@ function drawPlayers() {
   const list = $("activityList");
   list.innerHTML = "";
 
-  if (!players.length) {
-    list.innerHTML = "<li>Esperando a los jugadores...</li>";
-    return;
-  }
-
-  players.forEach((p) => {
+  players.forEach(p => {
     const li = document.createElement("li");
-
-    let state = "Esperando";
-    if (p.finished_at) state = "Llegó a la meta";
-    else if (p.is_ready) state = "Está listo";
-
     li.textContent =
-      `${p.role === "red" ? "🔴" : "🔵"} ${p.player_name}: ${state}`;
-
+      `${p.role === "red" ? "🔴" : "🔵"} ${p.player_name}: ${
+        p.is_ready ? "Listo" : "Esperando"
+      }`;
     list.appendChild(li);
   });
 }
 
 function drawWaitingRoom() {
-  const red = players.find((p) => p.role === "red");
-  const blue = players.find((p) => p.role === "blue");
+  const red = players.find(p => p.role === "red");
+  const blue = players.find(p => p.role === "blue");
 
   $("readyA").textContent = red
     ? `${red.player_name} — ${red.is_ready ? "✓ Listo" : "Esperando"}`
@@ -517,9 +509,6 @@ function drawWaitingRoom() {
     ? `${blue.player_name} — ${blue.is_ready ? "✓ Listo" : "Esperando"}`
     : "Esperando jugador azul...";
 
-  $("readyA").className = red?.is_ready ? "ready" : "waiting";
-  $("readyB").className = blue?.is_ready ? "ready" : "waiting";
-
   $("waitingRoom").hidden = !currentPlayer;
 
   $("readyButton").disabled =
@@ -528,19 +517,40 @@ function drawWaitingRoom() {
     Boolean(currentPlayer.is_ready) ||
     players.length !== 2;
 
-  if (!room) return;
-
-  if (room.status === "waiting") {
+  if (room?.status === "waiting") {
     $("readyMessage").textContent = players.length < 2
       ? "Esperando al segundo jugador..."
       : "Los dos jugadores deben pulsar ¡Estoy listo!";
-  } else if (room.status === "countdown") {
-    $("readyMessage").textContent = "¡Prepárense! La carrera va a comenzar.";
-  } else if (room.status === "racing") {
-    $("readyMessage").textContent = "¡La carrera está en marcha!";
-  } else if (room.status === "finished") {
-    $("readyMessage").textContent = "La carrera terminó.";
   }
+}
+  if (!player) {
+    element.style.display = "none";
+    return;
+  }
+
+  // Recuperar posición si estaba vacía en Supabase
+  if (player.x === null || player.x === undefined) {
+    player.x = getStartPosition(player.role);
+  }
+
+  if (player.y === null || player.y === undefined) {
+    player.y = GROUND_TOP - PLAYER_HEIGHT / 2;
+  }
+
+  element.style.display = "grid";
+  element.style.left = `${Number(player.x)}px`;
+  element.style.top = `${Number(player.y)}px`;
+
+  // Mostrar el nombre encima del pirata
+  let nameLabel = element.querySelector(".pirate-name");
+
+  if (!nameLabel) {
+    nameLabel = document.createElement("span");
+    nameLabel.className = "pirate-name";
+    element.appendChild(nameLabel);
+  }
+
+  nameLabel.textContent = player.player_name;
 }
 
 // --------------------------------------------------
