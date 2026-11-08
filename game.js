@@ -228,7 +228,8 @@ function createWorldItems() {
 
     obstacle.style.position = "absolute";
     obstacle.style.left = `${position}px`;
-    obstacle.style.bottom = `${FLOOR}px`;
+    obstacle.style.bottom = "0px";
+    obstacle.style.transform = "translateY(4px)";
     obstacle.style.zIndex = "5";
     obstacle.style.fontSize = "42px";
     obstacle.style.lineHeight = "1";
@@ -245,7 +246,8 @@ function createWorldItems() {
 
     chest.style.position = "absolute";
     chest.style.left = `${position}px`;
-    chest.style.bottom = `${FLOOR}px`;
+    chest.style.bottom = "0px";
+    chest.style.transform = "translateY(4px)";
     chest.style.zIndex = "5";
     chest.style.fontSize = "32px";
     chest.style.lineHeight = "1";
@@ -260,7 +262,6 @@ function createWorldItems() {
     });
   });
 }
-
 async function collectChestAt(x) {
   if (!me || room?.status !== "racing") return;
 
