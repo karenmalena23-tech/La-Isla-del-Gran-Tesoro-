@@ -1,6 +1,6 @@
 // CONFIGURACIÓN DE SUPABASE
-const SUPABASE_URL = "TU_SUPABASE_URL_AQUI";
-const SUPABASE_KEY = "TU_SUPABASE_ANON_KEY_AQUI";
+const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 // Elementos DOM
