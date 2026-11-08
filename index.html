@@ -46,20 +46,23 @@
         <h3>Isla: <span id="currentRoomCode">ISLA1</span></h3>
         <div class="players-status-grid">
           <div class="player-card red">
-            <h4>🔴 Pirata 1</h4>
+            <h4>🔴 Pirata 1 (Rojo)</h4>
             <p id="p1Info">Esperando...</p>
           </div>
           <div class="player-card blue">
-            <h4>🔵 Pirata 2</h4>
+            <h4>🔵 Pirata 2 (Azul)</h4>
             <p id="p2Info">Esperando...</p>
           </div>
         </div>
-        <button id="readyBtn" class="gold-btn">¡Estoy Listo!</button>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button id="readyBtn" class="gold-btn" style="flex: 2;">¡Estoy Listo!</button>
+          <button id="leaveRoomBtn" style="background:#a84343; flex: 1;">Abandonar Sala</button>
+        </div>
       </div>
       <div id="countdownDisplay" class="countdown" hidden>5</div>
     </section>
 
-    <!-- FASE 3: ESCENARIO DE JUEGO Y CONTROLES TÁCTILES -->
+    <!-- FASE 3: ESCENARIO DE JUEGO Y CONTROLES -->
     <section id="gameSection" class="panel" hidden>
       <div class="game-header">
         <div class="timer">⏱️ Tiempo: <span id="timerDisplay">02:30</span></div>
@@ -73,21 +76,24 @@
           <div class="hill hill-3"></div>
           <div id="obstaclesLayer"></div>
           <div id="chestsLayer"></div>
-          <div id="pirate1" class="pirate red">🏴‍☠️<span class="p-tag" id="tagP1">P1</span></div>
-          <div id="pirate2" class="pirate blue">🦜<span class="p-tag" id="tagP2">P2</span></div>
+          <div id="pirate1" class="pirate red">🏴‍☠️<span class="p-tag">P1</span></div>
+          <div id="pirate2" class="pirate blue">🦜<span class="p-tag">P2</span></div>
           <div id="finishFlag">🏁 META 🏆</div>
           <div class="ground-dirt"></div>
         </div>
       </div>
 
-      <!-- BOTONES TÁCTILES PARA CELULAR / TABLET Y PC -->
+      <!-- BOTONES TÁCTILES / PANTALLA -->
       <div class="touch-controls">
         <button id="leftBtn" class="control-btn">⬅️ Izquierda</button>
         <button id="jumpBtn" class="control-btn jump">⬆️ Saltar</button>
         <button id="rightBtn" class="control-btn">Derecha ➡️</button>
       </div>
 
-      <p class="controls-hint">Usa las teclas <strong>A / D</strong> o los botones táctiles en pantalla para moverte y saltar.</p>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+        <p class="controls-hint" style="margin: 0;">Usa <strong>A / D</strong> o <strong>Flechas</strong> para moverte | <strong>W / Espacio / ⬆️</strong> para saltar.</p>
+        <button onclick="location.reload()" style="background: #a84343; padding: 6px 12px; font-size: 12px;">Reiniciar / Salir</button>
+      </div>
     </section>
 
     <!-- MARCADOR GLOBAL EN VIVO -->
