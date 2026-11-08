@@ -1,9 +1,10 @@
 
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
-const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
+const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mcb8RYk";
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = id => document.getElementById(id);
+
 const WIDTH = 4200;
 const FINISH = 4050;
 const GAME_TIME = 300;
@@ -27,15 +28,14 @@ let lastSave = 0;
 let ending = false;
 let saving = false;
 
-let chestElements = [];
 let collectedChests = new Set();
-let collectingChests = new Set();
+let chestElements = [];
 
 function say(id, text) {
   $(id).textContent = text;
 }
 
-/* CUENTAS */
+/* AUTENTICACIÓN */
 
 async function authUI() {
   $("loggedInArea").hidden = !user;
@@ -94,7 +94,7 @@ async function logout() {
   await authUI();
 }
 
-/* VICTORIAS E HISTORIAL */
+/* VICTORIAS PERSONALES */
 
 async function loadPersonalWins() {
   if (!user) return;
@@ -116,8 +116,12 @@ async function loadPersonalWins() {
     $("historyList").appendChild(li);
   });
 
-  if (!data.length) $("historyList").textContent = "Aún no tienes victorias.";
+  if (!data.length) {
+    $("historyList").textContent = "Aún no tienes victorias.";
+  }
 }
+
+/* HISTORIAL Y CLASIFICACIÓN */
 
 async function loadHistory() {
   if (!user) return;
@@ -146,16 +150,18 @@ async function loadHistory() {
     wins[m.winner_name] = (wins[m.winner_name] || 0) + 1;
   });
 
-  if (!data.length) $("matchHistoryList").textContent = "Todavía no hay carreras.";
+  if (!data.length) {
+    $("matchHistoryList").textContent = "Todavía no hay carreras.";
+  }
 
-  Object.entries(wins).sort((a, b) => b[1] - a[1]).forEach(([name, n], i) => {
+  Object.entries(wins).sort((a,b) => b[1]-a[1]).forEach(([name,n],i) => {
     const li = document.createElement("li");
-    li.textContent = `${i + 1}. ${name}: ${n} victorias`;
+    li.textContent = `${i+1}. ${name}: ${n} victorias`;
     $("leaderboardList").appendChild(li);
   });
 }
 
-/* SALAS */
+/* ISLAS */
 
 async function ensureRoom() {
   let { data, error } = await db.from("treasure_rooms")
@@ -186,7 +192,7 @@ async function ensureRoom() {
 }
 
 async function loadRoom() {
-  const [p, r] = await Promise.all([
+  const [p,r] = await Promise.all([
     db.from("treasure_players").select("*").eq("room_code", code),
     db.from("treasure_rooms").select("*").eq("room_code", code).single()
   ]);
@@ -196,7 +202,6 @@ async function loadRoom() {
 
   players = p.data || [];
   room = r.data;
-
   me = players.find(p => p.id === me?.id) || me;
 
   render();
@@ -207,101 +212,86 @@ async function loadRoom() {
   }
 }
 
-/* OBSTÁCULOS Y COFRES */
+/* COFRES Y OBSTÁCULOS */
 
 function createWorldItems() {
   const world = $("world");
 
-  world.querySelectorAll(".generated-world-item").forEach(el => el.remove());
+  world.querySelectorAll(".chest, .obstacle").forEach(el => el.remove());
 
   chestElements = [];
-  collectedChests = new Set();
-  collectingChests = new Set();
-
-  const obstacleIcons = ["🪨", "🌳", "🪵", "🌴"];
-
-  OBSTACLE_POSITIONS.forEach((position, index) => {
-    const obstacle = document.createElement("div");
-
-    obstacle.className = "obstacle generated-world-item";
-    obstacle.textContent = obstacleIcons[index % obstacleIcons.length];
-
-    obstacle.style.position = "absolute";
-    obstacle.style.left = `${position}px`;
-    obstacle.style.bottom = "0px";
-    obstacle.style.transform = "translateY(4px)";
-    obstacle.style.zIndex = "5";
-    obstacle.style.fontSize = "42px";
-    obstacle.style.lineHeight = "1";
-    obstacle.style.pointerEvents = "none";
-
-    world.appendChild(obstacle);
-  });
 
   CHEST_POSITIONS.forEach((position, index) => {
     const chest = document.createElement("div");
 
-    chest.className = "chest generated-world-item";
+    chest.className = "chest";
     chest.textContent = "🧰";
-
-    chest.style.position = "absolute";
     chest.style.left = `${position}px`;
-    chest.style.bottom = "0px";
-    chest.style.transform = "translateY(4px)";
-    chest.style.zIndex = "5";
-    chest.style.fontSize = "32px";
-    chest.style.lineHeight = "1";
-    chest.style.pointerEvents = "none";
+    chest.dataset.id = index;
+
+    if (collectedChests.has(index)) {
+      chest.classList.add("collected");
+    }
 
     world.appendChild(chest);
+    chestElements.push(chest);
+  });
 
-    chestElements.push({
-      element: chest,
-      position,
-      index
-    });
+  OBSTACLE_POSITIONS.forEach((position, index) => {
+    const obstacle = document.createElement("div");
+
+    obstacle.className = "obstacle";
+    obstacle.textContent = ["🪨", "🌳", "🪵", "🌴"][index % 4];
+    obstacle.style.left = `${position}px`;
+
+    world.appendChild(obstacle);
   });
 }
+
 async function collectChestAt(x) {
   if (!me || room?.status !== "racing") return;
 
-  const chest = chestElements.find(item =>
-    Math.abs(x - item.position) < 32 &&
-    !collectedChests.has(item.index) &&
-    !collectingChests.has(item.index)
-  );
+  for (let i = 0; i < CHEST_POSITIONS.length; i++) {
+    if (collectedChests.has(i)) continue;
 
-  if (!chest) return;
+    if (Math.abs(x - CHEST_POSITIONS[i]) < 35) {
+      collectedChests.add(i);
 
-  collectingChests.add(chest.index);
+      const chest = chestElements[i];
 
-  const newScore = Number(me.score || 0) + 1;
+      if (chest) {
+        chest.classList.add("collected");
+      }
 
-  const { error } = await db.from("treasure_players")
-    .update({ score: newScore })
-    .eq("id", me.id);
+      const newScore = Number(me.score || 0) + 1;
+      me.score = newScore;
 
-  collectingChests.delete(chest.index);
+      const player = players.find(p => p.id === me.id);
 
-  if (error) {
-    say("gameMessage", "No se pudo recoger el cofre: " + error.message);
-    return;
+      if (player) {
+        player.score = newScore;
+      }
+
+      const red = players.find(p => p.role === "red");
+      const blue = players.find(p => p.role === "blue");
+
+      say("scoreA", red?.score ?? 0);
+      say("scoreB", blue?.score ?? 0);
+      say("gameMessage", "🎁 ¡Has recogido un cofre! +1 punto");
+
+      const { error } = await db.from("treasure_players")
+        .update({ score: newScore })
+        .eq("id", me.id);
+
+      if (error) {
+        console.error("Error guardando el cofre:", error);
+        say("gameMessage", "No se pudo guardar el punto.");
+      }
+    }
   }
-
-  collectedChests.add(chest.index);
-
-  me.score = newScore;
-
-  const index = players.findIndex(p => p.id === me.id);
-  if (index !== -1) players[index].score = newScore;
-
-  chest.element.hidden = true;
-
-  render();
-  say("gameMessage", "💰 ¡Recogiste un cofre! +1 punto");
 }
 
-/* DIBUJAR JUGADORES */
+/* INTERFAZ DEL JUEGO */
 
 function render() {
   const red = players.find(p => p.role === "red");
@@ -313,8 +303,13 @@ function render() {
   say("scoreA", red?.score ?? 0);
   say("scoreB", blue?.score ?? 0);
 
-  say("readyA", red ? `${red.player_name}: ${red.is_ready ? "✓ Listo" : "Esperando"}` : "Esperando jugador rojo");
-  say("readyB", blue ? `${blue.player_name}: ${blue.is_ready ? "✓ Listo" : "Esperando"}` : "Esperando jugador azul");
+  say("readyA", red
+    ? `${red.player_name}: ${red.is_ready ? "✓ Listo" : "Esperando"}`
+    : "Esperando jugador rojo");
+
+  say("readyB", blue
+    ? `${blue.player_name}: ${blue.is_ready ? "✓ Listo" : "Esperando"}`
+    : "Esperando jugador azul");
 
   $("waitingRoom").hidden = !me;
 
@@ -332,10 +327,6 @@ function render() {
   $("finalResult").hidden = room?.status !== "finished";
   $("countdownDisplay").hidden = room?.status !== "countdown";
 
-  chestElements.forEach(chest => {
-    chest.element.hidden = collectedChests.has(chest.index);
-  });
-
   updateCamera();
 }
 
@@ -351,7 +342,10 @@ function updateCamera() {
   if (!me) return;
 
   const view = $("island").clientWidth;
-  const offset = Math.max(0, Math.min(WIDTH - view, Number(me.x) - view / 2));
+  const offset = Math.max(
+    0,
+    Math.min(WIDTH - view, Number(me.x) - view / 2)
+  );
 
   $("world").style.transform = `translateX(${-offset}px)`;
 }
@@ -422,9 +416,10 @@ async function join() {
       me = data;
     }
 
-    createWorldItems();
-
     await loadRoom();
+
+    collectedChests = new Set();
+    createWorldItems();
 
     connect();
     startGameLoop();
@@ -442,7 +437,7 @@ async function join() {
   }
 }
 
-/* LISTO Y CUENTA REGRESIVA */
+/* LISTOS Y CUENTA REGRESIVA */
 
 async function ready() {
   if (!me || players.length !== 2) return;
@@ -464,8 +459,6 @@ async function ready() {
   }
 }
 
-/* TEMPORIZADOR */
-
 async function tick() {
   if (!me || !room) return;
 
@@ -482,8 +475,8 @@ async function tick() {
         status: "racing",
         started_at: new Date().toISOString()
       })
-        .eq("room_code", code)
-        .eq("status", "countdown");
+      .eq("room_code", code)
+      .eq("status", "countdown");
 
       await loadRoom();
     }
@@ -495,7 +488,10 @@ async function tick() {
       Math.ceil(GAME_TIME - (Date.now() - new Date(room.started_at).getTime()) / 1000)
     );
 
-    say("timerDisplay", `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`);
+    say(
+      "timerDisplay",
+      `${String(Math.floor(left / 60)).padStart(2,"0")}:${String(left % 60).padStart(2,"0")}`
+    );
 
     if (left <= 0) {
       await db.from("treasure_rooms").update({ status: "finished" })
@@ -508,35 +504,44 @@ async function tick() {
   }
 }
 
-/* SINCRONIZACIÓN MULTIJUGADOR */
+/* CONEXIÓN EN TIEMPO REAL */
 
 function connect() {
   if (channel) db.removeChannel(channel);
 
   channel = db.channel("isla-" + code)
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "treasure_players",
-      filter: `room_code=eq.${code}`
-    }, async payload => {
-      if (payload.new?.id === me?.id) return;
-
-      await loadRoom();
-    })
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "treasure_rooms",
-      filter: `room_code=eq.${code}`
-    }, async () => {
-      await loadRoom();
-    })
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "treasure_match_history"
-    }, loadHistory)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "treasure_players",
+        filter: `room_code=eq.${code}`
+      },
+      async payload => {
+        if (payload.new?.id === me?.id) return;
+        await loadRoom();
+      }
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "treasure_rooms",
+        filter: `room_code=eq.${code}`
+      },
+      loadRoom
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "treasure_match_history"
+      },
+      loadHistory
+    )
     .subscribe();
 }
 
@@ -561,7 +566,7 @@ function move() {
 
   updateCamera();
 
-  collectChestAt(x);
+  void collectChestAt(x);
 
   if (x >= FINISH) finishRace();
 }
@@ -602,23 +607,11 @@ async function finishRace() {
     p_player_id: me.id
   });
 
-  if (error) {
-    say("gameMessage", error.message);
-    ending = false;
-    return;
-  }
-
-  await db.from("treasure_rooms")
-    .update({ status: "finished" })
-    .eq("room_code", code)
-    .not("winner_player_id", "is", null);
+  if (error) say("gameMessage", error.message);
 
   await loadRoom();
-
   ending = false;
 }
-
-/* GUARDAR RESULTADOS */
 
 async function saveResult() {
   if (!user || !me || room?.winner_player_id !== me.id || saving) return;
@@ -652,7 +645,9 @@ async function saveResult() {
       player_name: me.player_name
     });
 
-    if (winError && winError.code !== "23505") console.error(winError);
+    if (winError && winError.code !== "23505") {
+      console.error(winError);
+    }
 
     await loadPersonalWins();
     await loadHistory();
@@ -664,17 +659,15 @@ async function saveResult() {
   }
 }
 
-/* PANTALLA GANASTE / PERDISTE */
-
 function showResult() {
   $("finalResult").hidden = false;
 
   if (!room.winner_player_id) {
-    say("winnerMessage", "⏰ Se acabó el tiempo. ¡La carrera terminó!");
+    say("winnerMessage", "⏰ Se acabó el tiempo. Lo sentimos, has perdido.");
   } else if (room.winner_player_id === me?.id) {
     say("winnerMessage", "🎉 ¡GANASTE! ¡Encontraste el gran tesoro!");
   } else {
-    say("winnerMessage", `😔 ¡PERDISTE! Ganó ${room.winner_name}.`);
+    say("winnerMessage", `😔 Has perdido. Ganó ${room.winner_name}.`);
   }
 }
 
@@ -705,11 +698,10 @@ async function restart() {
 
   if (error) return say("gameMessage", error.message);
 
+  collectedChests = new Set();
   createWorldItems();
 
-  ending = false;
   $("finalResult").hidden = true;
-
   say("timerDisplay", "05:00");
   say("gameMessage", "Carrera reiniciada. ¡Los dos deben marcar listo!");
 
@@ -734,10 +726,8 @@ async function leave() {
   me = null;
   players = [];
   room = null;
-
+  collectedChests = new Set();
   chestElements = [];
-  collectedChests.clear();
-  collectingChests.clear();
 
   $("waitingRoom").hidden = true;
   $("pirateA").hidden = true;
