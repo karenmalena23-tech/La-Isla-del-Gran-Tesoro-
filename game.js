@@ -283,15 +283,48 @@ async function tick() {
   }
 }
 
+
+function showRaceResult(room) {
+  if (!room?.winner_player_id || !me) return;
+
+  const finalResult = document.getElementById("finalResult");
+  const winnerMessage = document.getElementById("winnerMessage");
+
+  finalResult.hidden = false;
+
+  winnerMessage.textContent =
+    room.winner_player_id === me.id
+      ? "🏆 ¡GANASTE!"
+      : "😢 ¡PERDISTE!";
+}
+
 function connect() {
   if (channel) db.removeChannel(channel);
+
   channel = db.channel("isla-" + code)
-    .on("postgres_changes",{event:"*",schema:"public",table:"treasure_players",filter:`room_code=eq.${code}`},async payload=>{
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "treasure_players",
+      filter: `room_code=eq.${code}`
+    }, async payload => {
       if (payload.new?.id === me?.id) return;
       await loadRoom();
     })
-    .on("postgres_changes",{event:"*",schema:"public",table:"treasure_rooms",filter:`room_code=eq.${code}`},loadRoom)
-    .on("postgres_changes",{event:"*",schema:"public",table:"treasure_match_history"},loadHistory)
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "treasure_rooms",
+      filter: `room_code=eq.${code}`
+    }, async payload => {
+      await loadRoom();
+      showRaceResult(payload.new);
+    })
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "treasure_match_history"
+    }, loadHistory)
     .subscribe();
 }
 
