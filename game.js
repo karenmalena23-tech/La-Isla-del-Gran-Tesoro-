@@ -13,6 +13,7 @@ const roomLobby = document.getElementById('roomLobby');
 const p1Info = document.getElementById('p1Info');
 const p2Info = document.getElementById('p2Info');
 const readyBtn = document.getElementById('readyBtn');
+const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 const countdownDisplay = document.getElementById('countdownDisplay');
 const timerDisplay = document.getElementById('timerDisplay');
 const userWinsCount = document.getElementById('userWinsCount');
@@ -34,7 +35,7 @@ let isReady = false;
 let gameState = 'idle';
 
 let posX1 = 100, posY1 = 0, isJumping1 = false;
-let posX2 = 100, posY2 = 0;
+let posX2 = 100, posY2 = 0, isJumping2 = false;
 let timeLeft = 150; 
 let timerInterval = null;
 
@@ -75,7 +76,6 @@ async function handleAuth(type) {
 }
 
 async function loadWinsAndScoreboard() {
-  // Cargar victorias personales
   const { data } = await supabaseClient.from('profiles').select('wins').eq('id', currentUser.id).single();
   if (data) {
     currentWins = data.wins || 0;
@@ -117,6 +117,14 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
   connectRealtimeRoom();
 });
 
+leaveRoomBtn.addEventListener('click', () => {
+  if (roomChannel) supabaseClient.removeChannel(roomChannel);
+  roomLobby.hidden = true;
+  isReady = false;
+  readyBtn.textContent = "¡Estoy Listo!";
+  readyBtn.style.background = "#e5b653";
+});
+
 function connectRealtimeRoom() {
   if (roomChannel) supabaseClient.removeChannel(roomChannel);
 
@@ -127,12 +135,14 @@ function connectRealtimeRoom() {
   roomChannel
     .on('presence', { event: 'sync' }, () => {
       const state = roomChannel.presenceState();
-      const keys = Object.keys(state);
-      const myIndex = keys.indexOf(currentUser.id);
+      const usersInRoom = Object.keys(state);
+
+      usersInRoom.sort();
+      const myIndex = usersInRoom.indexOf(currentUser.id);
       myRole = (myIndex === 0) ? 'p1' : 'p2';
 
-      p1Info.textContent = keys[0] ? "Conectado 🟢" : "Esperando...";
-      p2Info.textContent = keys[1] ? "Conectado 🟢" : "Esperando...";
+      p1Info.textContent = usersInRoom[0] ? "Conectado 🟢" : "Esperando...";
+      p2Info.textContent = usersInRoom[1] ? "Conectado 🟢" : "Esperando...";
     })
     .on('broadcast', { event: 'player_move' }, payload => {
       if (payload.payload.role === 'p1') {
@@ -146,6 +156,10 @@ function connectRealtimeRoom() {
         pirate2.style.left = posX2 + 'px';
         pirate2.style.bottom = (55 + posY2) + 'px';
       }
+
+      const localX = (myRole === 'p1') ? posX1 : posX2;
+      const camX = Math.max(0, localX - 220);
+      worldTrack.style.transform = `translateX(-${camX}px)`;
     })
     .on('broadcast', { event: 'chest_taken' }, payload => {
       collectedChests.add(payload.payload.chestId);
@@ -170,8 +184,12 @@ readyBtn.addEventListener('click', async () => {
   readyBtn.textContent = isReady ? "Cancelar Listo" : "¡Estoy Listo!";
   readyBtn.style.background = isReady ? "#529e72" : "#e5b653";
 
-  if (isReady && myRole === 'p1') {
-    roomChannel.send({ type: 'broadcast', event: 'start_countdown', payload: {} });
+  if (roomChannel) {
+    roomChannel.send({ 
+      type: 'broadcast', 
+      event: 'start_countdown', 
+      payload: {} 
+    });
   }
 });
 
@@ -180,6 +198,7 @@ function triggerCountdown() {
   countdownDisplay.hidden = false;
   let count = 5;
   countdownDisplay.textContent = count;
+  roomLobby.hidden = true;
 
   const t = setInterval(() => {
     count--;
@@ -202,6 +221,7 @@ function startMatch() {
   timeLeft = 150;
   updateTimerUI();
 
+  if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     timeLeft--;
     updateTimerUI();
@@ -245,12 +265,15 @@ function renderMap() {
   });
 }
 
-// CONTROL POR TECLADO Y BOTONES TÁCTILES
+// CONTROLES DE MOVIMIENTO Y SALTO CORREGIDOS
 window.addEventListener('keydown', e => {
   if (gameState !== 'playing') return;
   if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') movePlayer('right');
   if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') movePlayer('left');
-  if (e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') movePlayer('jump');
+  if (e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    movePlayer('jump');
+  }
 });
 
 document.getElementById('leftBtn').addEventListener('click', () => movePlayer('left'));
@@ -259,34 +282,40 @@ document.getElementById('jumpBtn').addEventListener('click', () => movePlayer('j
 
 function movePlayer(action) {
   if (gameState !== 'playing') return;
-  let moved = false;
 
   if (myRole === 'p1') {
-    if (action === 'right') { posX1 = Math.min(4050, posX1 + 14); moved = true; }
-    if (action === 'left') { posX1 = Math.max(40, posX1 - 14); moved = true; }
+    if (action === 'right') posX1 = Math.min(4050, posX1 + 16);
+    if (action === 'left') posX1 = Math.max(40, posX1 - 16);
     if (action === 'jump' && !isJumping1) {
-      isJumping1 = true; posY1 = 95; moved = true;
-      setTimeout(() => { posY1 = 0; isJumping1 = false; broadcastMove(); }, 350);
+      isJumping1 = true;
+      posY1 = 110;
+      setTimeout(() => {
+        posY1 = 0;
+        isJumping1 = false;
+        broadcastMove();
+      }, 400);
     }
-    if (moved) {
-      pirate1.style.left = posX1 + 'px';
-      pirate1.style.bottom = (55 + posY1) + 'px';
-      broadcastMove();
-      checkCollisions(posX1, 'p1');
-    }
+    pirate1.style.left = posX1 + 'px';
+    pirate1.style.bottom = (55 + posY1) + 'px';
+    broadcastMove();
+    checkCollisions(posX1, 'p1');
+
   } else if (myRole === 'p2') {
-    if (action === 'right') { posX2 = Math.min(4050, posX2 + 14); moved = true; }
-    if (action === 'left') { posX2 = Math.max(40, posX2 - 14); moved = true; }
+    if (action === 'right') posX2 = Math.min(4050, posX2 + 16);
+    if (action === 'left') posX2 = Math.max(40, posX2 - 16);
     if (action === 'jump' && !isJumping2) {
-      isJumping2 = true; posY2 = 95; moved = true;
-      setTimeout(() => { posY2 = 0; isJumping2 = false; broadcastMove(); }, 350);
+      isJumping2 = true;
+      posY2 = 110;
+      setTimeout(() => {
+        posY2 = 0;
+        isJumping2 = false;
+        broadcastMove();
+      }, 400);
     }
-    if (moved) {
-      pirate2.style.left = posX2 + 'px';
-      pirate2.style.bottom = (55 + posY2) + 'px';
-      broadcastMove();
-      checkCollisions(posX2, 'p2');
-    }
+    pirate2.style.left = posX2 + 'px';
+    pirate2.style.bottom = (55 + posY2) + 'px';
+    broadcastMove();
+    checkCollisions(posX2, 'p2');
   }
 }
 
@@ -307,7 +336,7 @@ function broadcastMove() {
 
 function checkCollisions(xPos, role) {
   chests.forEach((cx, idx) => {
-    if (!collectedChests.has(idx) && Math.abs(xPos - cx) < 25) {
+    if (!collectedChests.has(idx) && Math.abs(xPos - cx) < 28) {
       collectedChests.add(idx);
       const chestEl = document.getElementById(`chest-${idx}`);
       if (chestEl) chestEl.classList.add('collected');
