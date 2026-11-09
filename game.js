@@ -199,6 +199,7 @@ function triggerCountdown() {
   let count = 5;
   countdownDisplay.textContent = count;
   roomLobby.hidden = true;
+  lobbySection.hidden = true; // Oculta el lobby en ambos dispositivos simultáneamente
 
   const t = setInterval(() => {
     count--;
@@ -215,7 +216,8 @@ function triggerCountdown() {
 function startMatch() {
   gameState = 'playing';
   lobbySection.hidden = true;
-  gameSection.hidden = false;
+  roomLobby.hidden = true;
+  gameSection.hidden = false; // Fuerza la apertura del juego en ambos dispositivos a la vez
   renderMap();
 
   timeLeft = 150;
@@ -265,7 +267,7 @@ function renderMap() {
   });
 }
 
-// CONTROLES DE MOVIMIENTO Y SALTO CORREGIDOS
+// CONTROLES DE MOVIMIENTO Y SALTO FLUIDO
 window.addEventListener('keydown', e => {
   if (gameState !== 'playing') return;
   if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') movePlayer('right');
