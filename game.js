@@ -1,3 +1,4 @@
+
 const SUPABASE_URL = "https://byvfpocakysizleuzypp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_r3qvHV87P1PWrLjs_UfyDA_Mbcb8RYk";
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
@@ -30,13 +31,13 @@ let playerName = "Pirata";
 let currentWins = 0;
 let roomChannel = null;
 let roomCode = 'ISLA1';
-let myRole = null; 
+let myRole = null;
 let isReady = false;
 let gameState = 'idle';
 
 let posX1 = 100, posY1 = 0, isJumping1 = false;
 let posX2 = 100, posY2 = 0, isJumping2 = false;
-let timeLeft = 150; 
+let timeLeft = 150;
 let timerInterval = null;
 
 const obstacles = [400, 950, 1400, 1900, 2450, 2900, 3450, 3800];
@@ -59,6 +60,7 @@ async function handleAuth(type) {
 
   authStatus.textContent = "Conectando...";
   let res;
+
   if (type === 'signup') {
     res = await supabaseClient.auth.signUp({ email, password });
   } else {
@@ -79,20 +81,24 @@ async function handleAuth(type) {
 
 async function loadWinsAndScoreboard() {
   const { data } = await supabaseClient.from('profiles').select('wins').eq('id', currentUser.id).single();
+
   if (data) {
     currentWins = data.wins || 0;
   } else {
     await supabaseClient.from('profiles').insert([{ id: currentUser.id, email: currentUser.email, wins: 0, last_win_time: 'Nunca' }]);
     currentWins = 0;
   }
+
   userWinsCount.textContent = currentWins;
   await fetchGlobalScoreboard();
 }
 
 async function fetchGlobalScoreboard() {
   const { data } = await supabaseClient.from('profiles').select('email, wins, last_win_time').order('wins', { ascending: false }).limit(5);
+
   if (data && data.length > 0) {
     scoreboardBody.innerHTML = '';
+
     data.forEach(row => {
       const tr = document.createElement('tr');
       tr.innerHTML = `<td>🏴‍☠️ ${row.email.split('@')[0]}</td><td>${row.last_win_time || 'Sin registro'}</td><td>🏆 <strong>${row.wins}</strong></td>`;
@@ -107,6 +113,7 @@ async function saveWin() {
   currentWins += 1;
   userWinsCount.textContent = currentWins;
   const now = new Date().toLocaleString();
+
   await supabaseClient.from('profiles').update({ wins: currentWins, last_win_time: now }).eq('id', currentUser.id);
   await fetchGlobalScoreboard();
 }
@@ -121,6 +128,7 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
 
 leaveRoomBtn.addEventListener('click', () => {
   if (roomChannel) supabaseClient.removeChannel(roomChannel);
+
   roomLobby.hidden = true;
   isReady = false;
   readyBtn.textContent = "¡Estoy Listo!";
@@ -138,41 +146,40 @@ function connectRealtimeRoom() {
   roomChannel
     .on('presence', { event: 'sync' }, () => {
       const state = roomChannel.presenceState();
-      const usersInRoom = Object.keys(state);
+      const usersInRoom = Object.keys(state).sort();
 
-      usersInRoom.sort();
       const myIndex = usersInRoom.indexOf(currentUser.id);
-      myRole = (myIndex === 0) ? 'p1' : 'p2';
+      myRole = myIndex === 0 ? 'p1' : 'p2';
 
-      p1Info.textContent = usersInRoom[0] ? (playersReadyState[usersInRoom[0]] ? "¡Listo! 🟢" : "Conectado 🟢") : "Esperando...";
-      p2Info.textContent = usersInRoom[1] ? (playersReadyState[usersInRoom[1]] ? "¡Listo! 🟢" : "Conectado 🟢") : "Esperando...";
-    })
-    .on('broadcast', { event: 'player_ready' }, payload => {
-      playersReadyState[payload.payload.userId] = payload.payload.ready;
-      
-      const state = roomChannel.presenceState();
-      const usersInRoom = Object.keys(state);
+      const u1 = usersInRoom[0];
+      const u2 = usersInRoom[1];
 
-      if (usersInRoom.length >= 2) {
-        const u1 = usersInRoom[0];
-        const u2 = usersInRoom[1];
+      const ready1 = u1
+        ? state[u1].some(user => user.ready === true)
+        : false;
 
-        p1Info.textContent = playersReadyState[u1] ? "¡Listo! 🟢" : "Conectado 🟢";
-        p2Info.textContent = playersReadyState[u2] ? "¡Listo! 🟢" : "Conectado 🟢";
+      const ready2 = u2
+        ? state[u2].some(user => user.ready === true)
+        : false;
 
-        if (playersReadyState[u1] && playersReadyState[u2] && gameState === 'idle') {
-          gameState = 'countdown';
-          roomChannel.send({ type: 'broadcast', event: 'start_match_now', payload: {} });
-          triggerCountdown();
-        }
-      }
-    })
-    .on('broadcast', { event: 'start_match_now' }, () => {
-      if (gameState === 'idle') {
-        gameState = 'countdown';
+      p1Info.textContent = u1
+        ? (ready1 ? "¡Listo! 🟢" : "Conectado 🟢")
+        : "Esperando...";
+
+      p2Info.textContent = u2
+        ? (ready2 ? "¡Listo! 🟢" : "Conectado 🟢")
+        : "Esperando...";
+
+      if (
+        usersInRoom.length >= 2 &&
+        ready1 &&
+        ready2 &&
+        gameState === 'idle'
+      ) {
         triggerCountdown();
       }
     })
+
     .on('broadcast', { event: 'player_move' }, payload => {
       if (payload.payload.role === 'p1') {
         posX1 = payload.payload.x;
@@ -190,45 +197,67 @@ function connectRealtimeRoom() {
       const camX = Math.max(0, localX - 220);
       worldTrack.style.transform = `translateX(-${camX}px)`;
     })
+
     .on('broadcast', { event: 'chest_taken' }, payload => {
       collectedChests.add(payload.payload.chestId);
       const chestEl = document.getElementById(`chest-${payload.payload.chestId}`);
       if (chestEl) chestEl.classList.add('collected');
     })
+
     .on('broadcast', { event: 'game_over' }, payload => {
       endGameRemote(payload.payload.winnerRole);
     })
+
     .subscribe(async status => {
       if (status === 'SUBSCRIBED') {
-        await roomChannel.track({ name: playerName, onlineAt: new Date().toISOString() });
+        await roomChannel.track({
+          name: playerName,
+          onlineAt: new Date().toISOString(),
+          ready: false
+        });
       }
     });
 }
 
 readyBtn.addEventListener('click', async () => {
-  isReady = !isReady;
-  readyBtn.textContent = isReady ? "Cancelar Listo" : "¡Estoy Listo!";
-  readyBtn.style.background = isReady ? "#529e72" : "#e5b653";
+  if (!roomChannel || !currentUser) return;
 
-  if (roomChannel) {
-    roomChannel.send({ 
-      type: 'broadcast', 
-      event: 'player_ready', 
-      payload: { userId: currentUser.id, ready: isReady } 
-    });
+  isReady = !isReady;
+
+  readyBtn.textContent = isReady
+    ? "Cancelar Listo"
+    : "¡Estoy Listo!";
+
+  readyBtn.style.background = isReady
+    ? "#529e72"
+    : "#e5b653";
+
+  const result = await roomChannel.track({
+    name: playerName,
+    onlineAt: new Date().toISOString(),
+    ready: isReady
+  });
+
+  if (result !== 'ok') {
+    console.error("No se pudo actualizar el estado de listo:", result);
   }
 });
 
 function triggerCountdown() {
+  if (gameState !== 'idle') return;
+
   gameState = 'countdown';
   countdownDisplay.hidden = false;
+
   let count = 5;
   countdownDisplay.textContent = count;
+
   roomLobby.hidden = true;
   lobbySection.hidden = true;
 
   const t = setInterval(() => {
     count--;
+
     if (count > 0) {
       countdownDisplay.textContent = count;
     } else {
@@ -250,11 +279,14 @@ function startMatch() {
   updateTimerUI();
 
   if (timerInterval) clearInterval(timerInterval);
+
   timerInterval = setInterval(() => {
     timeLeft--;
     updateTimerUI();
+
     if (timeLeft <= 0) {
       clearInterval(timerInterval);
+
       if (gameState === 'playing') {
         gameState = 'ended';
         timeOutOverlay.hidden = false;
@@ -272,6 +304,7 @@ function updateTimerUI() {
 function renderMap() {
   const obsLayer = document.getElementById('obstaclesLayer');
   const chestLayer = document.getElementById('chestsLayer');
+
   obsLayer.innerHTML = '';
   chestLayer.innerHTML = '';
 
@@ -296,8 +329,10 @@ function renderMap() {
 // CONTROLES DE MOVIMIENTO Y SALTO
 window.addEventListener('keydown', e => {
   if (gameState !== 'playing') return;
+
   if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') movePlayer('right');
   if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') movePlayer('left');
+
   if (e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') {
     e.preventDefault();
     movePlayer('jump');
@@ -314,15 +349,18 @@ function movePlayer(action) {
   if (myRole === 'p1') {
     if (action === 'right') posX1 = Math.min(4050, posX1 + 16);
     if (action === 'left') posX1 = Math.max(40, posX1 - 16);
+
     if (action === 'jump' && !isJumping1) {
       isJumping1 = true;
       posY1 = 110;
+
       setTimeout(() => {
         posY1 = 0;
         isJumping1 = false;
         broadcastMove();
       }, 400);
     }
+
     pirate1.style.left = posX1 + 'px';
     pirate1.style.bottom = (55 + posY1) + 'px';
     broadcastMove();
@@ -331,15 +369,18 @@ function movePlayer(action) {
   } else if (myRole === 'p2') {
     if (action === 'right') posX2 = Math.min(4050, posX2 + 16);
     if (action === 'left') posX2 = Math.max(40, posX2 - 16);
+
     if (action === 'jump' && !isJumping2) {
       isJumping2 = true;
       posY2 = 110;
+
       setTimeout(() => {
         posY2 = 0;
         isJumping2 = false;
         broadcastMove();
       }, 400);
     }
+
     pirate2.style.left = posX2 + 'px';
     pirate2.style.bottom = (55 + posY2) + 'px';
     broadcastMove();
@@ -349,6 +390,7 @@ function movePlayer(action) {
 
 function broadcastMove() {
   if (!roomChannel) return;
+
   const x = myRole === 'p1' ? posX1 : posX2;
   const y = myRole === 'p1' ? posY1 : posY2;
 
@@ -366,6 +408,7 @@ function checkCollisions(xPos, role) {
   chests.forEach((cx, idx) => {
     if (!collectedChests.has(idx) && Math.abs(xPos - cx) < 28) {
       collectedChests.add(idx);
+
       const chestEl = document.getElementById(`chest-${idx}`);
       if (chestEl) chestEl.classList.add('collected');
 
@@ -379,11 +422,13 @@ function checkCollisions(xPos, role) {
 
   if (xPos >= 4050 && gameState === 'playing') {
     gameState = 'ended';
+
     roomChannel.send({
       type: 'broadcast',
       event: 'game_over',
       payload: { winnerRole: role }
     });
+
     endGameRemote(role);
   }
 }
