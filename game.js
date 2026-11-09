@@ -43,7 +43,6 @@ const obstacles = [400, 950, 1400, 1900, 2450, 2900, 3450, 3800];
 const chests = [300, 800, 1250, 1750, 2200, 2750, 3200, 3650];
 let collectedChests = new Set();
 
-// Control de estados listos en la sala
 let playersReadyState = {};
 
 document.getElementById('loginBtn').addEventListener('click', () => handleAuth('login'));
@@ -153,20 +152,25 @@ function connectRealtimeRoom() {
       
       const state = roomChannel.presenceState();
       const usersInRoom = Object.keys(state);
-      usersInRoom.sort();
 
-      if (usersInRoom[0]) {
-        p1Info.textContent = playersReadyState[usersInRoom[0]] ? "¡Listo! 🟢" : "Conectado 🟢";
-      }
-      if (usersInRoom[1]) {
-        p2Info.textContent = playersReadyState[usersInRoom[1]] ? "¡Listo! 🟢" : "Conectado 🟢";
-      }
+      if (usersInRoom.length >= 2) {
+        const u1 = usersInRoom[0];
+        const u2 = usersInRoom[1];
 
-      // VERIFICACIÓN ESTRICTA: Si hay 2 jugadores y ambos están listos, se dispara el inicio para ambos por igual
-      if (usersInRoom.length >= 2 && playersReadyState[usersInRoom[0]] && playersReadyState[usersInRoom[1]]) {
-        if (gameState === 'idle') {
+        p1Info.textContent = playersReadyState[u1] ? "¡Listo! 🟢" : "Conectado 🟢";
+        p2Info.textContent = playersReadyState[u2] ? "¡Listo! 🟢" : "Conectado 🟢";
+
+        if (playersReadyState[u1] && playersReadyState[u2] && gameState === 'idle') {
+          gameState = 'countdown';
+          roomChannel.send({ type: 'broadcast', event: 'start_match_now', payload: {} });
           triggerCountdown();
         }
+      }
+    })
+    .on('broadcast', { event: 'start_match_now' }, () => {
+      if (gameState === 'idle') {
+        gameState = 'countdown';
+        triggerCountdown();
       }
     })
     .on('broadcast', { event: 'player_move' }, payload => {
@@ -206,7 +210,6 @@ readyBtn.addEventListener('click', async () => {
   readyBtn.textContent = isReady ? "Cancelar Listo" : "¡Estoy Listo!";
   readyBtn.style.background = isReady ? "#529e72" : "#e5b653";
 
-  // Transmitir el estado listo de este usuario específico a la red
   if (roomChannel) {
     roomChannel.send({ 
       type: 'broadcast', 
