@@ -43,6 +43,9 @@ const obstacles = [400, 950, 1400, 1900, 2450, 2900, 3450, 3800];
 const chests = [300, 800, 1250, 1750, 2200, 2750, 3200, 3650];
 let collectedChests = new Set();
 
+// Control de estados listos en la sala
+let playersReadyState = {};
+
 document.getElementById('loginBtn').addEventListener('click', () => handleAuth('login'));
 document.getElementById('signupBtn').addEventListener('click', () => handleAuth('signup'));
 
@@ -123,6 +126,7 @@ leaveRoomBtn.addEventListener('click', () => {
   isReady = false;
   readyBtn.textContent = "¡Estoy Listo!";
   readyBtn.style.background = "#e5b653";
+  playersReadyState = {};
 });
 
 function connectRealtimeRoom() {
@@ -141,8 +145,29 @@ function connectRealtimeRoom() {
       const myIndex = usersInRoom.indexOf(currentUser.id);
       myRole = (myIndex === 0) ? 'p1' : 'p2';
 
-      p1Info.textContent = usersInRoom[0] ? "Conectado 🟢" : "Esperando...";
-      p2Info.textContent = usersInRoom[1] ? "Conectado 🟢" : "Esperando...";
+      p1Info.textContent = usersInRoom[0] ? (playersReadyState[usersInRoom[0]] ? "¡Listo! 🟢" : "Conectado 🟢") : "Esperando...";
+      p2Info.textContent = usersInRoom[1] ? (playersReadyState[usersInRoom[1]] ? "¡Listo! 🟢" : "Conectado 🟢") : "Esperando...";
+    })
+    .on('broadcast', { event: 'player_ready' }, payload => {
+      playersReadyState[payload.payload.userId] = payload.payload.ready;
+      
+      const state = roomChannel.presenceState();
+      const usersInRoom = Object.keys(state);
+      usersInRoom.sort();
+
+      if (usersInRoom[0]) {
+        p1Info.textContent = playersReadyState[usersInRoom[0]] ? "¡Listo! 🟢" : "Conectado 🟢";
+      }
+      if (usersInRoom[1]) {
+        p2Info.textContent = playersReadyState[usersInRoom[1]] ? "¡Listo! 🟢" : "Conectado 🟢";
+      }
+
+      // VERIFICACIÓN ESTRICTA: Si hay 2 jugadores y ambos están listos, se dispara el inicio para ambos por igual
+      if (usersInRoom.length >= 2 && playersReadyState[usersInRoom[0]] && playersReadyState[usersInRoom[1]]) {
+        if (gameState === 'idle') {
+          triggerCountdown();
+        }
+      }
     })
     .on('broadcast', { event: 'player_move' }, payload => {
       if (payload.payload.role === 'p1') {
@@ -166,9 +191,6 @@ function connectRealtimeRoom() {
       const chestEl = document.getElementById(`chest-${payload.payload.chestId}`);
       if (chestEl) chestEl.classList.add('collected');
     })
-    .on('broadcast', { event: 'start_countdown' }, () => {
-      triggerCountdown();
-    })
     .on('broadcast', { event: 'game_over' }, payload => {
       endGameRemote(payload.payload.winnerRole);
     })
@@ -184,11 +206,12 @@ readyBtn.addEventListener('click', async () => {
   readyBtn.textContent = isReady ? "Cancelar Listo" : "¡Estoy Listo!";
   readyBtn.style.background = isReady ? "#529e72" : "#e5b653";
 
+  // Transmitir el estado listo de este usuario específico a la red
   if (roomChannel) {
     roomChannel.send({ 
       type: 'broadcast', 
-      event: 'start_countdown', 
-      payload: {} 
+      event: 'player_ready', 
+      payload: { userId: currentUser.id, ready: isReady } 
     });
   }
 });
@@ -199,7 +222,7 @@ function triggerCountdown() {
   let count = 5;
   countdownDisplay.textContent = count;
   roomLobby.hidden = true;
-  lobbySection.hidden = true; // Oculta el lobby en ambos dispositivos simultáneamente
+  lobbySection.hidden = true;
 
   const t = setInterval(() => {
     count--;
@@ -217,7 +240,7 @@ function startMatch() {
   gameState = 'playing';
   lobbySection.hidden = true;
   roomLobby.hidden = true;
-  gameSection.hidden = false; // Fuerza la apertura del juego en ambos dispositivos a la vez
+  gameSection.hidden = false;
   renderMap();
 
   timeLeft = 150;
@@ -267,7 +290,7 @@ function renderMap() {
   });
 }
 
-// CONTROLES DE MOVIMIENTO Y SALTO FLUIDO
+// CONTROLES DE MOVIMIENTO Y SALTO
 window.addEventListener('keydown', e => {
   if (gameState !== 'playing') return;
   if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') movePlayer('right');
